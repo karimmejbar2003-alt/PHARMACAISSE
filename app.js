@@ -124,8 +124,14 @@ const App = (() => {
   function dayData(pid, date) { return S.entries[eKey(pid, date)] || {}; }
 
   function blank() {
-    return { sobrus:'', espece:'', tpe:'', cheque:'', fournisseur_nom:'',
-             fournisseur_montant:'', depenses:'', remise:'', remarque:'', savedAt:null };
+    return { sobrus:'', espece:'', tpe:'', cheque:'',
+             fournisseurs:[{nom:'',montant:''}],
+             depenses:'', remise:'', remarque:'', savedAt:null };
+  }
+
+  function normFournisseurs(e) {
+    if (e.fournisseurs) return e.fournisseurs;
+    return [{ nom: e.fournisseur_nom || '', montant: e.fournisseur_montant || '' }];
   }
 
   function getEntry(pid, date, cid) { return (dayData(pid, date))[cid] || blank(); }
@@ -140,17 +146,20 @@ const App = (() => {
 
   // ── CALC ────────────────────────────────────────────────────────────────
   function calc(e) {
-    const sobrus = num(e.sobrus), espece = num(e.espece), tpe = num(e.tpe),
-          cheque = num(e.cheque), fourni = num(e.fournisseur_montant),
+    const fournisseurs = normFournisseurs(e);
+    const sobrus   = num(e.sobrus), espece = num(e.espece), tpe = num(e.tpe),
+          cheque   = num(e.cheque),
+          fourni   = fournisseurs.reduce((s, f) => s + num(f.montant), 0),
           depenses = num(e.depenses), remise = num(e.remise);
     const total = espece + tpe + cheque + fourni + depenses + remise;
     const diff  = total - sobrus;
     const sobrusOk  = e.sobrus !== '' && e.sobrus !== null;
     const anyDetail = e.espece !== '' || e.tpe !== '' || e.cheque !== '' ||
-                      e.fournisseur_montant !== '' || e.depenses !== '' || e.remise !== '';
+                      fournisseurs.some(f => f.montant !== '') ||
+                      e.depenses !== '' || e.remise !== '';
     const hasData = sobrusOk || anyDetail;
     const isValid = sobrusOk && Math.abs(diff) < 0.005;
-    return { sobrus, espece, tpe, cheque, fourni, depenses, remise, total, diff, hasData, isValid, sobrusOk };
+    return { sobrus, espece, tpe, cheque, fourni, fournisseurs, depenses, remise, total, diff, hasData, isValid, sobrusOk };
   }
 
   // ── RENDER ──────────────────────────────────────────────────────────────
@@ -249,6 +258,34 @@ const App = (() => {
     return `<div class="segment-wrap"><div class="segment">${btns}</div></div>`;
   }
 
+  // ── DAY TOTAL ────────────────────────────────────────────────────────────
+  function renderDayTotal(pharmacy) {
+    let totalSobrus = 0, totalDetail = 0, cntSobrus = 0;
+    pharmacy.caisses.forEach(c => {
+      const r = calc(getEntry(pharmacy.id, S.date, c.id));
+      if (r.sobrusOk) { totalSobrus += r.sobrus; cntSobrus++; }
+      if (r.hasData) totalDetail += r.total;
+    });
+    if (cntSobrus === 0 && totalDetail === 0) return '';
+    const diff = totalDetail - totalSobrus;
+    const balanced = cntSobrus > 0 && Math.abs(diff) < 0.005;
+    return `
+      <div class="day-total">
+        <div class="day-total-row">
+          <span class="day-total-label">Total Sobrus</span>
+          <span class="day-total-val">${fmt(totalSobrus)}</span>
+        </div>
+        <div class="day-total-row">
+          <span class="day-total-label">Total Détail</span>
+          <span class="day-total-val">${fmt(totalDetail)}</span>
+        </div>
+        ${cntSobrus > 0 ? `<div class="day-total-row ${balanced ? 'ok' : 'bad'}">
+          <span>${balanced ? '✓ Tout équilibré' : '⚠ Écart global'}</span>
+          <span class="day-total-val">${balanced ? '' : fmtD(diff)}</span>
+        </div>` : ''}
+      </div>`;
+  }
+
   // ── DAY VIEW ────────────────────────────────────────────────────────────
   function renderDay(pharmacy) {
     if (!pharmacy) return empty('🏥', 'Aucune pharmacie', 'Ajoutez-en une dans Réglages.');
@@ -268,6 +305,8 @@ const App = (() => {
         </div>
         <button class="date-arrow ${isToday ? 'off' : ''}" onclick="App.nextDay()">›</button>
       </div>
+
+      ${renderDayTotal(pharmacy)}
 
       <div class="top-actions">
         <button class="btn btn-secondary btn-sm" onclick="App.saveAll('${pharmacy.id}')">
@@ -355,21 +394,23 @@ const App = (() => {
           oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
       </div>
 
+      ${normFournisseurs(entry).map((f, idx) => `
       <div class="field-row">
-        <span class="field-label">🏭 Fournisseur</span>
+        <span class="field-label">🏭 ${idx === 0 ? 'Fournisseur' : ''}</span>
         <div class="fourni-group">
-          <select class="fourni-picker"
-            id="f-${cid}-fournisseur_nom"
-            onchange="App.onInput('${pid}','${cid}','fournisseur_nom',this.value)">
+          <select class="fourni-picker" onchange="App.onFourni('${pid}','${cid}',${idx},'nom',this.value)">
             <option value="">Aucun</option>
-            ${FOURNISSEURS.map(n => `<option value="${n}" ${entry.fournisseur_nom === n ? 'selected' : ''}>${n}</option>`).join('')}
+            ${FOURNISSEURS.map(n => `<option value="${n}" ${f.nom === n ? 'selected' : ''}>${n}</option>`).join('')}
           </select>
-          <input type="number" class="fourni-amount"
-            id="f-${cid}-fournisseur_montant" placeholder="0,00"
-            value="${esc(entry.fournisseur_montant)}"
+          <input type="number" class="fourni-amount" placeholder="0,00"
+            value="${esc(f.montant)}"
             step="0.01" min="0" inputmode="decimal"
-            oninput="App.onInput('${pid}','${cid}','fournisseur_montant',this.value)">
+            oninput="App.onFourni('${pid}','${cid}',${idx},'montant',this.value)">
+          ${normFournisseurs(entry).length > 1 ? `<button class="fourni-del" onclick="App.removeFourni('${pid}','${cid}',${idx})">✕</button>` : ''}
         </div>
+      </div>`).join('')}
+      <div class="field-row fourni-add-row">
+        <button class="btn btn-ghost" style="font-size:14px;padding:6px 0" onclick="App.addFourni('${pid}','${cid}')">＋ Fournisseur</button>
       </div>
 
       <div class="field-row">
@@ -530,7 +571,9 @@ const App = (() => {
           <div class="det-row"><span class="det-key">Espèce</span><span class="det-val">${fmt(c.espece)}</span></div>
           <div class="det-row"><span class="det-key">TPE</span><span class="det-val">${fmt(c.tpe)}</span></div>
           <div class="det-row"><span class="det-key">Chèque</span><span class="det-val">${fmt(c.cheque)}</span></div>
-          ${(entry.fournisseur_nom || c.fourni > 0) ? `<div class="det-row"><span class="det-key">Fournisseur</span><span class="det-val">${entry.fournisseur_nom ? esc(entry.fournisseur_nom) + ' · ' : ''}${fmt(c.fourni)}</span></div>` : ''}
+          ${c.fournisseurs.filter(f => f.nom || num(f.montant) > 0).map(f =>
+            `<div class="det-row"><span class="det-key">Fournisseur</span><span class="det-val">${f.nom ? esc(f.nom) + ' · ' : ''}${fmt(f.montant)}</span></div>`
+          ).join('')}
           <div class="det-row"><span class="det-key">Dépenses</span><span class="det-val">${fmt(c.depenses)}</span></div>
           <div class="det-row"><span class="det-key">Remise</span><span class="det-val">${fmt(c.remise)}</span></div>
           <div class="det-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:14px">
@@ -849,6 +892,36 @@ const App = (() => {
     inp.click();
   }
 
+  // ── FOURNISSEURS MULTI ───────────────────────────────────────────────────
+  function _ensureEntry(pid, cid) {
+    const k = eKey(pid, S.date);
+    if (!S.entries[k]) S.entries[k] = {};
+    if (!S.entries[k][cid]) S.entries[k][cid] = blank();
+    const e = S.entries[k][cid];
+    if (!e.fournisseurs) e.fournisseurs = normFournisseurs(e);
+    return e;
+  }
+
+  function addFourni(pid, cid) {
+    const e = _ensureEntry(pid, cid);
+    e.fournisseurs.push({ nom: '', montant: '' });
+    save(); render();
+  }
+
+  function removeFourni(pid, cid, idx) {
+    const e = _ensureEntry(pid, cid);
+    if (e.fournisseurs.length <= 1) return;
+    e.fournisseurs.splice(idx, 1);
+    save(); render();
+  }
+
+  function onFourni(pid, cid, idx, field, value) {
+    const e = _ensureEntry(pid, cid);
+    if (!e.fournisseurs[idx]) e.fournisseurs[idx] = { nom: '', montant: '' };
+    e.fournisseurs[idx][field] = value;
+    save(); updateCard(pid, cid);
+  }
+
   // ── EMPLOYEE LINKS ───────────────────────────────────────────────────────
   function copyEmpLink(pid, cid) {
     const base = window.location.origin + window.location.pathname;
@@ -919,5 +992,6 @@ const App = (() => {
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
     exportData, importData, closeModal, toggleTheme, copyEmpLink,
+    addFourni, removeFourni, onFourni,
   };
 })();

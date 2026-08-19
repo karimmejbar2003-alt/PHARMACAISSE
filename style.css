@@ -938,6 +938,42 @@ html, body {
   .desk-nav { display: none; }
 }
 
+/* ── DAY TOTAL CARD ───────────────────────────────────────────── */
+.day-total {
+  margin: 4px var(--gutter) 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--r-xl);
+  border: 0.5px solid var(--border);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
+}
+
+.day-total-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 18px;
+  border-bottom: 0.5px solid var(--sep);
+  font-size: 15px;
+}
+.day-total-row:last-child { border-bottom: none; }
+.day-total-row.ok  { color: var(--ok);  font-weight: 600; }
+.day-total-row.bad { color: var(--bad); font-weight: 600; }
+
+.day-total-label { color: var(--t2); font-size: 14px; }
+.day-total-val   { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+
+/* ── MULTI FOURNISSEUR ─────────────────────────────────────────── */
+.fourni-del {
+  background: none; border: none;
+  color: var(--bad); font-size: 15px;
+  cursor: pointer; padding: 4px 6px;
+  border-radius: var(--r-xs);
+  line-height: 1; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.fourni-del:active { background: var(--bad-bg); }
+
+.fourni-add-row { padding-top: 2px; padding-bottom: 2px; border-bottom: none; }
+
 /* ── EMPLOYEE MODE ────────────────────────────────────────────── */
 .emp-content {
   padding-bottom: 40px;
