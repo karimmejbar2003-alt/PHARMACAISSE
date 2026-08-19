@@ -68,6 +68,44 @@ const App = (() => {
       && Notification.permission === 'granted';
   }
 
+  async function sendReminder(pid) {
+    if (!db) return toast('Firebase non connecté');
+    const pharmacy = S.pharmacies.find(p => p.id === pid); if (!pharmacy) return;
+    const day = dayData(pid, S.date);
+    const missing = pharmacy.caisses.filter(c => !day[c.id]?.lockedByEmp).map(c => c.name);
+    if (!missing.length) return toast('Tous les employés ont soumis leurs données');
+    const snap = await db.doc(FS_DOC).get().catch(() => null);
+    if (!snap) return;
+    const subs = (snap.data()?.empPushSubs || [])
+      .filter(s => s.pharmacyId === pid && pharmacy.caisses.find(c => c.id === s.caisseId && !day[c.id]?.lockedByEmp));
+    if (!subs.length) return toast('Aucun employé n\'a activé les rappels');
+    const payload = { title: 'PharmaCaisse — Rappel', body: 'Merci de saisir vos chiffres du jour', icon: '/icon-192.png' };
+    await Promise.all(subs.map(s =>
+      fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ subscription: s.sub, payload }) }).catch(() => {})
+    ));
+    toast(`Rappel envoyé — ${subs.length} employé${subs.length > 1 ? 's' : ''}`);
+  }
+
+  async function empSubscribePush() {
+    if (!('PushManager' in window)) return toast('Non supporté sur ce navigateur');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return toast('Permission refusée');
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+      const session = getEmpSession();
+      if (db && session) {
+        await db.doc(FS_DOC).update({
+          empPushSubs: firebase.firestore.FieldValue.arrayUnion({ pharmacyId: session.pharmacyId, caisseId: session.caisseId, name: session.name, sub: JSON.parse(JSON.stringify(sub)) })
+        }).catch(() => db.doc(FS_DOC).set({ empPushSubs: [{ pharmacyId: session.pharmacyId, caisseId: session.caisseId, name: session.name, sub: JSON.parse(JSON.stringify(sub)) }] }, { merge: true }));
+      }
+      localStorage.setItem('emp_push_sub', '1');
+      toast('Rappels activés');
+      renderEmpDashboard();
+    } catch (e) { toast('Erreur activation'); }
+  }
+
   async function sendOwnerNotification(pharmacyName, caisseName, empName) {
     if (!db) return;
     try {
@@ -372,6 +410,12 @@ const App = (() => {
           <div class="emp-date">${fmtDateLong(S.date)}</div>
         </div>
         <div class="emp-grid">${renderEmpCard(pharmacy, caisse)}</div>
+        ${!localStorage.getItem('emp_push_sub') ? `
+        <div class="emp-push-row">
+          <button class="btn btn-secondary btn-sm" onclick="App.empSubscribePush()">
+            Activer les rappels du patron
+          </button>
+        </div>` : ''}
         <div class="emp-footer">Données transmises au patron en temps réel</div>
       </div>`;
     genIcon();
@@ -459,8 +503,10 @@ const App = (() => {
     const k = eKey(pid, S.date);
     if (!S.entries[k]) S.entries[k] = {};
     if (!S.entries[k][cid]) S.entries[k][cid] = blank();
-    S.entries[k][cid].savedAt      = new Date().toISOString();
+    const _now = new Date().toISOString();
+    S.entries[k][cid].savedAt      = _now;
     S.entries[k][cid].lockedByEmp  = true;
+    addLog(S.entries[k][cid], `Envoyé par ${getEmpSession()?.name || 'employé'}`, _now);
     save();
     toast('✓ Données envoyées au patron !');
 
@@ -604,16 +650,25 @@ const App = (() => {
 
       ${renderDayTotal(pharmacy)}
 
+      ${isDayLocked(pharmacy.id) ? `
+      <div class="day-locked-banner">
+        <span>Journée clôturée — lecture seule</span>
+        <button class="btn btn-muted btn-sm" onclick="App.unlockDay('${pharmacy.id}')">Réouvrir</button>
+      </div>` : ''}
+
       <div class="top-actions">
+        ${!isDayLocked(pharmacy.id) ? `
         <button class="btn btn-secondary btn-sm" onclick="App.saveAll('${pharmacy.id}')">
           Tout sauvegarder
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('day')">
-          PDF
-        </button>
+        </button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="App.exportCSV('day')">CSV</button>
+        <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('day')">PDF</button>
+        ${!isDayLocked(pharmacy.id) ? `
+        <button class="btn btn-secondary btn-sm" onclick="App.sendReminder('${pharmacy.id}')">Rappel</button>
+        <button class="btn btn-muted btn-sm" onclick="App.lockDay('${pharmacy.id}')">Clôturer</button>` : ''}
       </div>
 
-      <div class="caisse-grid">${cards}</div>`;
+      <div class="caisse-grid ${isDayLocked(pharmacy.id) ? 'day-locked' : ''}">${cards}</div>`;
   }
 
   function daySummary(pharmacy) {
@@ -874,12 +929,65 @@ const App = (() => {
             <span>⚠ Écart</span><span>${fmtD(c.diff)}</span>
           </div>` : ''}
           ${entry.remarque ? `<div class="det-note">${esc(entry.remarque)}</div>` : ''}
+          ${entry._log?.length ? `
+          <div class="det-log">
+            ${[...entry._log].reverse().map(l =>
+              `<div class="det-log-row"><span>${esc(l.a)}</span><span>${fmtTime(l.t)}</span></div>`
+            ).join('')}
+          </div>` : ''}
         </div>`;
     }).filter(Boolean).join('');
 
     return `
       <div class="sec-caption">${esc(pharmacy.name)}</div>
       ${cards || empty('—', 'Aucune donnée', '')}`;
+  }
+
+  // ── MONTH CHART ──────────────────────────────────────────────────────────
+  function renderMonthChart(pharmacy, days) {
+    if (days.length < 2) return '';
+    const data = days.map(date => {
+      let sobrus = 0, detail = 0, hasEcart = false;
+      pharmacy.caisses.forEach(c => {
+        const entry = dayData(pharmacy.id, date)[c.id]; if (!entry) return;
+        const r = calc(entry); if (!r.hasData) return;
+        if (r.sobrusOk) sobrus += r.sobrus;
+        detail += r.total;
+        if (!r.isValid) hasEcart = true;
+      });
+      return { date, sobrus, detail, hasEcart };
+    });
+
+    const maxVal = Math.max(...data.map(d => Math.max(d.sobrus, d.detail)), 1);
+    const W = 600, H = 120, PAD = 24, BOTTOM = 20;
+    const bw  = Math.max(4, Math.floor((W - PAD * 2) / (data.length * 1.5)));
+    const gap  = Math.floor((W - PAD * 2 - bw * data.length) / (data.length + 1));
+
+    const bars = data.map((d, i) => {
+      const x   = PAD + gap + i * (bw + gap);
+      const bh  = Math.max(2, ((d.sobrus || d.detail) / maxVal) * (H - BOTTOM - 10));
+      const y   = H - BOTTOM - bh;
+      const col = d.sobrus > 0 ? (d.hasEcart ? 'var(--bad)' : 'var(--ok)') : 'var(--border)';
+      return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="2" fill="${col}" opacity="0.85"/>`;
+    }).join('');
+
+    // X-axis labels (every ~5 days)
+    const labels = data.filter((_, i) => i % Math.ceil(data.length / 8) === 0).map(d => {
+      const i = data.indexOf(d);
+      const x = PAD + gap + i * (bw + gap) + bw / 2;
+      return `<text x="${x}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--t2)">${fmtDate(d.date).slice(0,5)}</text>`;
+    }).join('');
+
+    return `
+      <div class="month-chart-wrap">
+        <div class="month-chart-legend">
+          <span class="chart-dot ok"></span>Équilibré
+          <span class="chart-dot bad"></span>Écart
+        </div>
+        <svg viewBox="0 0 ${W} ${H}" class="month-chart" preserveAspectRatio="none">
+          ${bars}${labels}
+        </svg>
+      </div>`;
   }
 
   // ── MONTH VIEW ───────────────────────────────────────────────────────────
@@ -948,7 +1056,12 @@ const App = (() => {
         <button class="date-arrow ${!canNext ? 'off' : ''}" onclick="App.nextMonth()">›</button>
       </div>
 
-      ${t.dayCount > 0 ? `<div class="top-actions"><button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">Export PDF</button></div>` : ''}
+      ${t.dayCount > 0 ? `
+        <div class="top-actions">
+          <button class="btn btn-secondary btn-sm" onclick="App.exportCSV('month')">CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">PDF</button>
+        </div>
+        ${renderMonthChart(pharmacy, days)}` : ''}
 
       ${t.dayCount === 0
         ? empty('—', 'Aucune donnée', 'Aucune saisie pour ce mois.')
@@ -1278,10 +1391,18 @@ const App = (() => {
     const k = eKey(pid, S.date);
     if (!S.entries[k]) S.entries[k] = {};
     if (!S.entries[k][cid]) S.entries[k][cid] = blank();
-    S.entries[k][cid].savedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    S.entries[k][cid].savedAt = now;
+    addLog(S.entries[k][cid], 'Modifié (patron)', now);
     save(); toast('✓ Sauvegardé');
     const ft = document.getElementById(`ft-${cid}`);
-    if (ft) ft.textContent = `✓ Sauvegardé à ${fmtTime(S.entries[k][cid].savedAt)}`;
+    if (ft) ft.textContent = `✓ Sauvegardé à ${fmtTime(now)}`;
+  }
+
+  function addLog(entry, action, ts) {
+    if (!entry._log) entry._log = [];
+    entry._log.push({ a: action, t: ts });
+    if (entry._log.length > 10) entry._log.shift(); // garder 10 max
   }
 
   function saveAll(pid) {
@@ -1354,6 +1475,75 @@ const App = (() => {
         save(); render(); toast('Caisse supprimée');
       }
     });
+  }
+
+  // ── EXPORT CSV ───────────────────────────────────────────────────────────
+  function exportCSV(type) {
+    const pharmacy = S.pharmacies.find(p => p.id === S.pharmacyId);
+    if (!pharmacy) return toast('Aucune pharmacie sélectionnée');
+
+    const header = ['Date','Pharmacie','Caisse','Sobrus','Espèce','TPE','Chèque','Fournisseurs','Dépenses','Remise','Total Détail','Écart','Statut'];
+    const rows   = [header];
+
+    const addRow = (date, caisse, r, entry) => {
+      const fList = r.fournisseurs.filter(f => f.nom && num(f.montant) > 0)
+        .map(f => `${f.nom} ${num(f.montant).toFixed(2)}`).join(' + ');
+      rows.push([
+        fmtDate(date), pharmacy.name, caisse.name,
+        r.sobrusOk ? num(r.sobrus).toFixed(2) : '',
+        num(r.espece).toFixed(2), num(r.tpe).toFixed(2), num(r.cheque).toFixed(2),
+        fList, num(r.depenses).toFixed(2), num(r.remise).toFixed(2),
+        num(r.total).toFixed(2),
+        r.sobrusOk ? num(r.diff).toFixed(2) : '',
+        r.isValid ? 'Équilibré' : r.sobrusOk ? 'Écart' : 'En attente'
+      ]);
+    };
+
+    if (type === 'day') {
+      const day = dayData(pharmacy.id, S.date);
+      pharmacy.caisses.forEach(c => {
+        const entry = day[c.id]; if (!entry) return;
+        const r = calc(entry); if (!r.hasData) return;
+        addRow(S.date, c, r, entry);
+      });
+    } else {
+      const prefix = `${pharmacy.id}|${S.month}`;
+      Object.keys(S.entries).filter(k => k.startsWith(prefix))
+        .map(k => k.slice(pharmacy.id.length + 1)).sort()
+        .forEach(date => {
+          const day = dayData(pharmacy.id, date);
+          pharmacy.caisses.forEach(c => {
+            const entry = day[c.id]; if (!entry) return;
+            const r = calc(entry); if (!r.hasData) return;
+            addRow(date, c, r, entry);
+          });
+        });
+    }
+
+    const csv = '﻿' + rows.map(r =>
+      r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')
+    ).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+    a.download = `pharmacaisse_${type === 'day' ? S.date : S.month}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('Export CSV téléchargé');
+  }
+
+  // ── DAY LOCK ─────────────────────────────────────────────────────────────
+  function isDayLocked(pid) {
+    return !!(dayData(pid, S.date)['_locked']);
+  }
+  function lockDay(pid) {
+    const k = eKey(pid, S.date);
+    if (!S.entries[k]) S.entries[k] = {};
+    S.entries[k]['_locked'] = true;
+    save(); render(); toast('Journée clôturée');
+  }
+  function unlockDay(pid) {
+    const k = eKey(pid, S.date);
+    if (S.entries[k]) S.entries[k]['_locked'] = false;
+    save(); render(); toast('Journée réouverte');
   }
 
   // ── EXPORT / IMPORT ──────────────────────────────────────────────────────
@@ -1802,7 +1992,8 @@ const App = (() => {
     exportData, importData, closeModal, toggleTheme,
     toggleFourni, onFourniAmount,
     prevMonth, nextMonth, validateCard, exportPDF,
-    subscribeToPush,
+    subscribeToPush, sendReminder, empSubscribePush,
+    exportCSV, lockDay, unlockDay,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
     empLogout, submitEmpCard, copyLoginLink,
     addEmployee, editEmployee, saveEmployee, deleteEmployee,

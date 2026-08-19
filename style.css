@@ -938,6 +938,56 @@ html, body {
   .desk-nav { display: none; }
 }
 
+/* ── DAY LOCK ──────────────────────────────────────────────────── */
+.day-locked-banner {
+  margin: 4px var(--gutter) 4px;
+  background: rgba(255,159,10,0.10);
+  border: 0.5px solid rgba(255,159,10,0.30);
+  border-radius: var(--r-lg);
+  padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600; color: var(--warn);
+}
+.day-locked .pc { pointer-events: none; opacity: 0.65; }
+
+/* ── MONTH CHART ───────────────────────────────────────────────── */
+.month-chart-wrap {
+  margin: 4px var(--gutter) 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--r-xl);
+  border: 0.5px solid var(--border);
+  box-shadow: var(--sh-sm);
+  padding: 14px 16px 8px;
+  overflow: hidden;
+}
+.month-chart-legend {
+  font-size: 11px; color: var(--t2);
+  display: flex; gap: 14px; margin-bottom: 8px;
+  align-items: center;
+}
+.chart-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.chart-dot.ok  { background: var(--ok); }
+.chart-dot.bad { background: var(--bad); }
+.month-chart { width: 100%; height: 100px; display: block; }
+
+/* ── DETAIL LOG ────────────────────────────────────────────────── */
+.det-log {
+  border-top: 0.5px solid var(--sep);
+  padding: 8px 18px 10px;
+}
+.det-log-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--t2);
+  padding: 3px 0; letter-spacing: -0.1px;
+}
+
+/* ── EMP PUSH ROW ──────────────────────────────────────────────── */
+.emp-push-row {
+  text-align: center; padding: 8px var(--gutter) 0;
+}
+
 /* ── MONTH RESUME ─────────────────────────────────────────────── */
 .month-totals {
   margin: 0 var(--gutter) 14px;
