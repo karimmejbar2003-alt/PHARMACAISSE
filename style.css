@@ -1215,6 +1215,47 @@ html, body {
 }
 .emp-logout-btn:active { opacity: 0.6; }
 
+/* ── MONTH DETAIL TABLE ────────────────────────────────────────── */
+.mdt-wrap {
+  margin: 0 var(--gutter) 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--r-xl);
+  border: 0.5px solid var(--border);
+  box-shadow: var(--sh-sm);
+}
+
+.mdt {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; white-space: nowrap;
+  background: var(--bg-elevated);
+}
+
+.mdt thead th {
+  background: var(--bg-inset);
+  color: var(--t2); font-size: 11px;
+  font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 9px 12px; text-align: left;
+  border-bottom: 0.5px solid var(--border);
+  position: sticky; top: 0;
+}
+
+.mdt tbody tr { border-bottom: 0.5px solid var(--sep); }
+.mdt tbody tr:last-child { border-bottom: none; }
+.mdt tbody tr:hover { background: var(--bg-inset); }
+
+.mdt-date   { padding: 10px 12px; color: var(--t1); font-weight: 600; }
+.mdt-caisse { padding: 10px 12px; color: var(--t2); }
+.mdt-num    { padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--t1); }
+.mdt-status { padding: 10px 12px; font-weight: 600; font-size: 12px; }
+.mdt-status.ok  { color: var(--ok); }
+.mdt-status.bad { color: var(--bad); }
+
+@media (min-width: 860px) {
+  .mdt-wrap { margin: 0 32px 20px; }
+}
+
 /* ── EMPLOYEE MODE ────────────────────────────────────────────── */
 .emp-content {
   padding-bottom: 40px;

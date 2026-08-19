@@ -947,7 +947,51 @@ const App = (() => {
                   </div>`}
            </div>
            <div class="sec-caption">Journées</div>
-           <div class="list-card">${dayRows}</div>`}`;
+           <div class="list-card">${dayRows}</div>
+           ${renderMonthDetailTable(pharmacy, days)}`}`;
+  }
+
+  function renderMonthDetailTable(pharmacy, days) {
+    if (!days.length) return '';
+    const rows = days.flatMap(date => {
+      const day = dayData(pharmacy.id, date);
+      return pharmacy.caisses.map(c => {
+        const entry = day[c.id]; if (!entry) return null;
+        const r = calc(entry); if (!r.hasData) return null;
+        return { date, c, entry, r };
+      }).filter(Boolean);
+    });
+    if (!rows.length) return '';
+
+    const trs = rows.map(({ date, c, entry, r }) => {
+      const ok = r.isValid;
+      return `<tr>
+        <td class="mdt-date">${fmtDate(date)}</td>
+        <td class="mdt-caisse">${esc(c.name)}</td>
+        <td class="mdt-num">${r.sobrusOk ? fmt(r.sobrus) : '—'}</td>
+        <td class="mdt-num">${fmt(r.espece)}</td>
+        <td class="mdt-num">${fmt(r.tpe)}</td>
+        <td class="mdt-num">${fmt(r.cheque)}</td>
+        <td class="mdt-num">${r.fourni > 0 ? fmt(r.fourni) : '—'}</td>
+        <td class="mdt-num">${r.depenses > 0 ? fmt(r.depenses) : '—'}</td>
+        <td class="mdt-num">${r.remise > 0 ? fmt(r.remise) : '—'}</td>
+        <td class="mdt-status ${ok ? 'ok' : 'bad'}">${ok ? '✓' : fmtD(r.diff) + (entry.validated ? ' 👁' : '')}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="sec-caption">Détail jour par jour</div>
+      <div class="mdt-wrap">
+        <table class="mdt">
+          <thead><tr>
+            <th>Date</th><th>Caisse</th><th>Sobrus</th>
+            <th>Espèce</th><th>TPE</th><th>Chèque</th>
+            <th>Fourni.</th><th>Dépenses</th><th>Remise</th>
+            <th>Statut</th>
+          </tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>`;
   }
 
   // ── SETTINGS ────────────────────────────────────────────────────────────
@@ -1322,7 +1366,6 @@ const App = (() => {
     win.document.write(html);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 400);
   }
 
   function buildDayPDF(pharmacy) {
@@ -1381,7 +1424,6 @@ const App = (() => {
           </tr>
         </tbody>
       </table>
-      <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})<\/script>
     </body></html>`;
   }
 
@@ -1443,7 +1485,39 @@ const App = (() => {
         <thead><tr><th>Date</th><th class="num">Total Sobrus</th><th class="num">Total Détail</th><th>Statut</th></tr></thead>
         <tbody>${dayRows||'<tr><td colspan="4" style="text-align:center;color:#999;padding:20px">Aucune journée</td></tr>'}</tbody>
       </table>
-      <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})<\/script>
+
+      <h3 style="margin-top:24px">Détail jour par jour</h3>
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Caisse</th><th class="num">Sobrus</th>
+          <th class="num">Espèce</th><th class="num">TPE</th><th class="num">Chèque</th>
+          <th class="num">Fourni.</th><th class="num">Dépenses</th><th class="num">Remise</th>
+          <th>Statut</th>
+        </tr></thead>
+        <tbody>
+          ${days.flatMap(date => {
+            const day = dayData(pharmacy.id, date);
+            return pharmacy.caisses.map(c => {
+              const entry = day[c.id]; if (!entry) return '';
+              const r = calc(entry); if (!r.hasData) return '';
+              const ok = r.isValid;
+              const vuNote = (!ok && entry.validated) ? ' <span style="color:#888">(vu)</span>' : '';
+              return `<tr>
+                <td>${fmtDate(date)}</td>
+                <td>${esc(c.name)}</td>
+                <td class="num">${r.sobrusOk ? fmt(r.sobrus) : '—'}</td>
+                <td class="num">${fmt(r.espece)}</td>
+                <td class="num">${fmt(r.tpe)}</td>
+                <td class="num">${fmt(r.cheque)}</td>
+                <td class="num">${r.fourni > 0 ? fmt(r.fourni) : '—'}</td>
+                <td class="num">${r.depenses > 0 ? fmt(r.depenses) : '—'}</td>
+                <td class="num">${r.remise > 0 ? fmt(r.remise) : '—'}</td>
+                <td><span class="${ok?'ok':'bad'}">${ok ? '✓ OK' : '⚠ '+fmtD(r.diff)}</span>${vuNote}</td>
+              </tr>`;
+            }).join('');
+          }).join('')}
+        </tbody>
+      </table>
     </body></html>`;
   }
 
