@@ -74,7 +74,7 @@ const App = (() => {
       const snap = await db.doc(FS_DOC).get();
       const subs = snap.data()?.pushSubscriptions || [];
       const payload = {
-        title: '💊 PharmaCaisse',
+        title: 'PharmaCaisse',
         body: `${empName} a envoyé ses chiffres — ${caisseName} (${pharmacyName})`,
         icon: '/icon-192.png'
       };
@@ -288,7 +288,7 @@ const App = (() => {
           ${emps.map(e => `
             <button class="emp-name-btn ${e.id === _ls.eid ? 'selected' : ''}"
               onclick="App.lsEmployee('${e.id}')">
-              <span class="emp-name-icon">👤</span>
+              
               ${esc(e.name)}
             </button>`).join('')}
         </div>
@@ -310,7 +310,7 @@ const App = (() => {
     document.getElementById('app').innerHTML = `
       <div class="login-wrap">
         <div class="login-card">
-          <div class="login-logo">💊</div>
+          <div class="login-logo">Rx</div>
           <div class="login-title">PharmaCaisse</div>
           <div class="login-sub">Espace employé</div>
           ${pharmSeg}
@@ -352,7 +352,7 @@ const App = (() => {
     if (!pharmacy || !caisse) {
       document.getElementById('app').innerHTML = `
         <div class="content emp-content">
-          ${empty('⚠️', 'Session invalide', 'Contactez le patron pour reconfigurer votre accès.')}
+          ${empty('!', 'Session invalide', 'Contactez le patron pour reconfigurer votre accès.')}
           <div style="text-align:center;padding:16px">
             <button class="btn btn-secondary" onclick="App.empLogout()">Se déconnecter</button>
           </div>
@@ -362,17 +362,17 @@ const App = (() => {
 
     document.getElementById('app').innerHTML = `
       <div class="emp-topbar">
-        <span class="emp-topbar-name">👤 ${esc(session.name)}</span>
+        <span class="emp-topbar-name">${esc(session.name)}</span>
         <button class="emp-logout-btn" onclick="App.empLogout()">Déconnexion</button>
       </div>
       <div class="content emp-content">
         <div class="emp-header">
           <div class="emp-pharma">${esc(pharmacy.name)}</div>
-          <div class="emp-name">💊 ${esc(caisse.name)}</div>
+          <div class="emp-name">${esc(caisse.name)}</div>
           <div class="emp-date">${fmtDateLong(S.date)}</div>
         </div>
         <div class="emp-grid">${renderEmpCard(pharmacy, caisse)}</div>
-        <div class="emp-footer">📡 Données transmises au patron en temps réel</div>
+        <div class="emp-footer">Données transmises au patron en temps réel</div>
       </div>`;
     genIcon();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -386,21 +386,21 @@ const App = (() => {
     // ── Verrouillé après envoi ───────────────────────────────────────────
     if (entry.lockedByEmp) {
       const fourniLines = r.fournisseurs.filter(f => f.nom || num(f.montant) > 0)
-        .map(f => `<div class="emp-sent-row"><span>🏭 ${f.nom||'Fournisseur'}</span><span>${fmt(f.montant)}</span></div>`).join('');
+        .map(f => `<div class="emp-sent-row"><span>${f.nom||'Fournisseur'}</span><span>${fmt(f.montant)}</span></div>`).join('');
       return `
       <div class="pc ok">
         <div class="pc-header">
-          <div class="pc-name">💊 ${esc(caisse.name)}</div>
+          <div class="pc-name">${esc(caisse.name)}</div>
           <div class="pill pill-ok"><div class="pill-dot"></div>Données envoyées</div>
         </div>
         <div class="emp-sent-summary">
-          <div class="emp-sent-row"><span>💵 Espèce</span><span>${fmt(r.espece)}</span></div>
-          <div class="emp-sent-row"><span>💳 TPE</span><span>${fmt(r.tpe)}</span></div>
-          <div class="emp-sent-row"><span>🏦 Chèque</span><span>${fmt(r.cheque)}</span></div>
+          <div class="emp-sent-row"><span>Espèce</span><span>${fmt(r.espece)}</span></div>
+          <div class="emp-sent-row"><span>TPE</span><span>${fmt(r.tpe)}</span></div>
+          <div class="emp-sent-row"><span>Chèque</span><span>${fmt(r.cheque)}</span></div>
           ${fourniLines}
-          <div class="emp-sent-row"><span>💸 Dépenses</span><span>${fmt(r.depenses)}</span></div>
-          <div class="emp-sent-row"><span>🏷 Remise</span><span>${fmt(r.remise)}</span></div>
-          ${entry.remarque ? `<div class="emp-sent-note">📝 ${esc(entry.remarque)}</div>` : ''}
+          <div class="emp-sent-row"><span>Dépenses</span><span>${fmt(r.depenses)}</span></div>
+          <div class="emp-sent-row"><span>Remise</span><span>${fmt(r.remise)}</span></div>
+          ${entry.remarque ? `<div class="emp-sent-note">${esc(entry.remarque)}</div>` : ''}
           <div class="emp-sent-time">✓ Envoyé à ${fmtTime(entry.savedAt)}</div>
         </div>
         <div class="emp-locked-msg">Les données ont été transmises au patron.<br>Contactez-le si une correction est nécessaire.</div>
@@ -411,33 +411,33 @@ const App = (() => {
     return `
     <div class="pc" id="card-${cid}">
       <div class="pc-header">
-        <div class="pc-name">💊 ${esc(caisse.name)}</div>
+        <div class="pc-name">${esc(caisse.name)}</div>
         <div class="pill pill-idle"><div class="pill-dot"></div>Saisie du jour</div>
       </div>
       <div class="fields-label">Détail</div>
       <div class="field-row">
-        <span class="field-label">💵 Espèce</span>
+        <span class="field-label">Espèce</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.espece)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','espece',this.value)">
       </div>
       <div class="field-row">
-        <span class="field-label">💳 TPE</span>
+        <span class="field-label">TPE</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.tpe)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','tpe',this.value)">
       </div>
       <div class="field-row">
-        <span class="field-label">🏦 Chèque</span>
+        <span class="field-label">Chèque</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.cheque)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
       </div>
       ${renderFourniChips(pid, cid, entry)}
       <div class="field-row">
-        <span class="field-label">💸 Dépenses</span>
+        <span class="field-label">Dépenses</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.depenses)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','depenses',this.value)">
       </div>
       <div class="field-row" style="border-bottom:none">
-        <span class="field-label">🏷 Remise</span>
+        <span class="field-label">Remise</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.remise)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','remise',this.value)">
       </div>
@@ -504,10 +504,10 @@ const App = (() => {
             </button>
             ${!showBack
               ? `<div class="desk-nav">
-                  <button class="desk-nav-btn ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">📋 Saisie</button>
-                  <button class="desk-nav-btn ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">📅 Historique</button>
-                  <button class="desk-nav-btn ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">📊 Résumé</button>
-                  <button class="desk-nav-btn ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">⚙️ Réglages</button>
+                  <button class="desk-nav-btn ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">Saisie</button>
+                  <button class="desk-nav-btn ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">Historique</button>
+                  <button class="desk-nav-btn ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">Résumé</button>
+                  <button class="desk-nav-btn ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">Réglages</button>
                 </div>`
               : ''}
           </div>
@@ -518,16 +518,16 @@ const App = (() => {
 
       <nav class="tabbar">
         <button class="tab-item ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">
-          <span class="tab-icon">📋</span>Saisie
+          Saisie
         </button>
         <button class="tab-item ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">
-          <span class="tab-icon">📅</span>Historique
+          Historique
         </button>
         <button class="tab-item ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">
-          <span class="tab-icon">📊</span>Résumé
+          Résumé
         </button>
         <button class="tab-item ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">
-          <span class="tab-icon">⚙️</span>Réglages
+          Réglages
         </button>
       </nav>`;
 
@@ -584,7 +584,7 @@ const App = (() => {
 
   // ── DAY VIEW ────────────────────────────────────────────────────────────
   function renderDay(pharmacy) {
-    if (!pharmacy) return empty('🏥', 'Aucune pharmacie', 'Ajoutez-en une dans Réglages.');
+    if (!pharmacy) return empty('—', 'Aucune pharmacie', 'Ajoutez-en une dans Réglages.');
 
     const isToday = S.date >= today();
     const summary = daySummary(pharmacy);
@@ -609,7 +609,7 @@ const App = (() => {
           Tout sauvegarder
         </button>
         <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('day')">
-          📄 PDF
+          PDF
         </button>
       </div>
 
@@ -646,7 +646,7 @@ const App = (() => {
     <div class="pc ${cardCls}" id="card-${cid}" style="animation-delay:${delay}s">
 
       <div class="pc-header">
-        <div class="pc-name">💊 ${esc(caisse.name)}</div>
+        <div class="pc-name">${esc(caisse.name)}</div>
         <div class="pill ${pillCls}" id="badge-${cid}">
           <div class="pill-dot"></div>${pillTxt}
         </div>
@@ -668,7 +668,7 @@ const App = (() => {
       <div class="fields-label">Détail</div>
 
       <div class="field-row">
-        <span class="field-label">💵 Espèce</span>
+        <span class="field-label">Espèce</span>
         <input type="number" class="field-input"
           id="f-${cid}-espece" placeholder="0,00"
           value="${esc(entry.espece)}"
@@ -677,7 +677,7 @@ const App = (() => {
       </div>
 
       <div class="field-row">
-        <span class="field-label">💳 TPE</span>
+        <span class="field-label">TPE</span>
         <input type="number" class="field-input"
           id="f-${cid}-tpe" placeholder="0,00"
           value="${esc(entry.tpe)}"
@@ -686,7 +686,7 @@ const App = (() => {
       </div>
 
       <div class="field-row">
-        <span class="field-label">🏦 Chèque</span>
+        <span class="field-label">Chèque</span>
         <input type="number" class="field-input"
           id="f-${cid}-cheque" placeholder="0,00"
           value="${esc(entry.cheque)}"
@@ -697,7 +697,7 @@ const App = (() => {
       ${renderFourniChips(pid, cid, entry)}
 
       <div class="field-row">
-        <span class="field-label">💸 Dépenses</span>
+        <span class="field-label">Dépenses</span>
         <input type="number" class="field-input"
           id="f-${cid}-depenses" placeholder="0,00"
           value="${esc(entry.depenses)}"
@@ -706,7 +706,7 @@ const App = (() => {
       </div>
 
       <div class="field-row" style="border-bottom:none">
-        <span class="field-label">🏷 Remise</span>
+        <span class="field-label">Remise</span>
         <input type="number" class="field-input"
           id="f-${cid}-remise" placeholder="0,00"
           value="${esc(entry.remise)}"
@@ -805,7 +805,7 @@ const App = (() => {
 
   // ── HISTORY ─────────────────────────────────────────────────────────────
   function renderHistory(pharmacy) {
-    if (!pharmacy) return empty('📅', 'Aucune pharmacie', '');
+    if (!pharmacy) return empty('—', 'Aucune pharmacie', '');
 
     const prefix = `${pharmacy.id}|`;
     const dates  = Object.keys(S.entries)
@@ -815,7 +815,7 @@ const App = (() => {
     const seg = renderSegment();
 
     if (dates.length === 0)
-      return seg + `<div style="padding-top:8px">` + empty('📅', 'Aucun historique', 'Les journées sauvegardées apparaîtront ici.') + `</div>`;
+      return seg + `<div style="padding-top:8px">` + empty('—', 'Aucun historique', 'Les journées sauvegardées apparaîtront ici.') + `</div>`;
 
     const rows = dates.map(date => {
       const day   = dayData(pharmacy.id, date);
@@ -842,7 +842,7 @@ const App = (() => {
   // ── DETAIL ──────────────────────────────────────────────────────────────
   function renderDetail() {
     const pharmacy = S.pharmacies.find(p => p.id === S.detailPid);
-    if (!pharmacy) return empty('📅', 'Données introuvables', '');
+    if (!pharmacy) return empty('—', 'Données introuvables', '');
 
     const day   = dayData(pharmacy.id, S.detailDate);
     const cards = pharmacy.caisses.map((caisse, i) => {
@@ -851,7 +851,7 @@ const App = (() => {
       return `
         <div class="det-card ${c.isValid ? 'ok' : c.hasData ? 'bad' : ''}" style="animation-delay:${i*0.06}s">
           <div class="det-header">
-            <div class="det-name">💊 ${esc(caisse.name)}</div>
+            <div class="det-name">${esc(caisse.name)}</div>
             <div class="pill ${c.isValid ? 'pill-ok' : c.hasData ? 'pill-bad' : 'pill-idle'}">
               <div class="pill-dot"></div>
               ${c.isValid ? 'Équilibré' : c.hasData ? 'Écart' : 'Non saisi'}
@@ -873,13 +873,13 @@ const App = (() => {
           ${!c.isValid && c.hasData ? `<div class="diff-alert" style="margin:0;border-radius:0">
             <span>⚠ Écart</span><span>${fmtD(c.diff)}</span>
           </div>` : ''}
-          ${entry.remarque ? `<div class="det-note">📝 ${esc(entry.remarque)}</div>` : ''}
+          ${entry.remarque ? `<div class="det-note">${esc(entry.remarque)}</div>` : ''}
         </div>`;
     }).filter(Boolean).join('');
 
     return `
       <div class="sec-caption">${esc(pharmacy.name)}</div>
-      ${cards || empty('📋', 'Aucune donnée', '')}`;
+      ${cards || empty('—', 'Aucune donnée', '')}`;
   }
 
   // ── MONTH VIEW ───────────────────────────────────────────────────────────
@@ -907,7 +907,7 @@ const App = (() => {
   }
 
   function renderMonth(pharmacy) {
-    if (!pharmacy) return empty('📊', 'Aucune pharmacie', '');
+    if (!pharmacy) return empty('—', 'Aucune pharmacie', '');
 
     const t = calcMonthTotals(pharmacy);
     const prefix  = `${pharmacy.id}|${S.month}`;
@@ -948,31 +948,31 @@ const App = (() => {
         <button class="date-arrow ${!canNext ? 'off' : ''}" onclick="App.nextMonth()">›</button>
       </div>
 
-      ${t.dayCount > 0 ? `<div class="top-actions"><button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">📄 PDF du mois</button></div>` : ''}
+      ${t.dayCount > 0 ? `<div class="top-actions"><button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">Export PDF</button></div>` : ''}
 
       ${t.dayCount === 0
-        ? empty('📊', 'Aucune donnée', 'Aucune saisie pour ce mois.')
+        ? empty('—', 'Aucune donnée', 'Aucune saisie pour ce mois.')
         : `<div class="sec-caption">Totaux du mois</div>
            <div class="month-totals">
              <div class="month-row">
-               <span class="month-key">💊 Total Sobrus</span>
+               <span class="month-key">Total Sobrus</span>
                <span class="month-val month-primary">${fmt(t.sobrus)}</span>
              </div>
              <div class="month-row">
-               <span class="month-key">💵 Espèce</span>
+               <span class="month-key">Espèce</span>
                <span class="month-val">${fmt(t.espece)}</span>
              </div>
              <div class="month-row">
-               <span class="month-key">💳 TPE</span>
+               <span class="month-key">TPE</span>
                <span class="month-val">${fmt(t.tpe)}</span>
              </div>
              <div class="month-row">
-               <span class="month-key">🏦 Chèque</span>
+               <span class="month-key">Chèque</span>
                <span class="month-val">${fmt(t.cheque)}</span>
              </div>
-             ${t.fourni > 0 ? `<div class="month-row"><span class="month-key">🏭 Fournisseurs</span><span class="month-val">${fmt(t.fourni)}</span></div>` : ''}
-             ${t.depenses > 0 ? `<div class="month-row"><span class="month-key">💸 Dépenses</span><span class="month-val">${fmt(t.depenses)}</span></div>` : ''}
-             ${t.remise > 0 ? `<div class="month-row"><span class="month-key">🏷 Remises</span><span class="month-val">${fmt(t.remise)}</span></div>` : ''}
+             ${t.fourni > 0 ? `<div class="month-row"><span class="month-key">Fournisseurs</span><span class="month-val">${fmt(t.fourni)}</span></div>` : ''}
+             ${t.depenses > 0 ? `<div class="month-row"><span class="month-key">Dépenses</span><span class="month-val">${fmt(t.depenses)}</span></div>` : ''}
+             ${t.remise > 0 ? `<div class="month-row"><span class="month-key">Remises</span><span class="month-val">${fmt(t.remise)}</span></div>` : ''}
              <div class="month-row month-sep">
                <span class="month-key" style="font-weight:700;color:var(--t1)">Total Détail</span>
                <span class="month-val month-primary">${fmt(totalDetail)}</span>
@@ -1040,18 +1040,18 @@ const App = (() => {
     const groups = S.pharmacies.map(p => {
       const rows = p.caisses.map(c => `
         <div class="set-row">
-          <span class="set-row-label">💊 ${esc(c.name)}</span>
+          <span class="set-row-label">${esc(c.name)}</span>
           <div class="set-btns">
-            <button class="btn btn-muted btn-sm" onclick="App.renameCaisse('${p.id}','${c.id}')">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="App.deleteCaisse('${p.id}','${c.id}')">🗑</button>
+            <button class="btn btn-muted btn-sm" onclick="App.renameCaisse('${p.id}','${c.id}')">Modifier</button>
+            <button class="btn btn-danger btn-sm" onclick="App.deleteCaisse('${p.id}','${c.id}')">Suppr.</button>
           </div>
         </div>`).join('');
       return `
         <div class="set-group">
           <div class="set-group-hd">
-            <span class="set-group-title">🏥 ${esc(p.name)}</span>
+            <span class="set-group-title">${esc(p.name)}</span>
             <button class="btn btn-muted btn-sm" onclick="App.renamePharmacy('${p.id}')">Renommer</button>
-            ${S.pharmacies.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="App.deletePharmacy('${p.id}')">🗑</button>` : ''}
+            ${S.pharmacies.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="App.deletePharmacy('${p.id}')">Suppr.</button>` : ''}
           </div>
           ${rows}
           <div class="set-row">
@@ -1065,7 +1065,7 @@ const App = (() => {
       ${groups}
       <div style="padding:0 18px 18px">
         <button class="btn btn-primary btn-full btn-lg" onclick="App.addPharmacy()">
-          🏥 Ajouter une pharmacie
+          Ajouter une pharmacie
         </button>
       </div>
 
@@ -1079,7 +1079,7 @@ const App = (() => {
             <code style="flex:1;font-size:12px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
               ${window.location.origin}${window.location.pathname}?login
             </code>
-            <button class="btn btn-secondary btn-sm" onclick="App.copyLoginLink()">🔗 Copier</button>
+            <button class="btn btn-secondary btn-sm" onclick="App.copyLoginLink()">Copier</button>
           </div>
         </div>
       </div>
@@ -1089,19 +1089,19 @@ const App = (() => {
           const caisse = p.caisses.find(c => c.id === e.caisseId);
           return `<div class="set-row">
             <div>
-              <div class="set-row-label">👤 ${esc(e.name)}</div>
-              <div class="set-row-sub">💊 ${esc(caisse?.name ?? '—')} · PIN : ${'•'.repeat(4)}</div>
+              <div class="set-row-label">${esc(e.name)}</div>
+              <div class="set-row-sub">${esc(caisse?.name ?? '—')} · PIN : ${'•'.repeat(4)}</div>
             </div>
             <div class="set-btns">
-              <button class="btn btn-muted btn-sm" onclick="App.editEmployee('${p.id}','${e.id}')">✏️</button>
-              <button class="btn btn-danger btn-sm" onclick="App.deleteEmployee('${p.id}','${e.id}')">🗑</button>
+              <button class="btn btn-muted btn-sm" onclick="App.editEmployee('${p.id}','${e.id}')">Modifier</button>
+              <button class="btn btn-danger btn-sm" onclick="App.deleteEmployee('${p.id}','${e.id}')">Suppr.</button>
             </div>
           </div>`;
         }).join('');
         return `
         <div class="set-group">
           <div class="set-group-hd">
-            <span class="set-group-title">🏥 ${esc(p.name)}</span>
+            <span class="set-group-title">${esc(p.name)}</span>
           </div>
           ${empRows}
           <div class="set-row">
@@ -1117,14 +1117,14 @@ const App = (() => {
             <div class="set-row-label">Exporter les données</div>
             <div class="set-row-sub">Sauvegarde JSON locale</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="App.exportData()">📤 Export</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.exportData()">Exporter</button>
         </div>
         <div class="set-row">
           <div>
             <div class="set-row-label">Importer des données</div>
             <div class="set-row-sub">Restaurer depuis JSON</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="App.importData()">📥 Import</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.importData()">Importer</button>
         </div>
       </div>
 
@@ -1132,7 +1132,7 @@ const App = (() => {
       <div class="set-group">
         <div class="set-row">
           <div>
-            <div class="set-row-label">🔔 Notifications push</div>
+            <div class="set-row-label">Notifications push</div>
             <div class="set-row-sub">${isPushSubscribed() ? 'Activées — vous serez notifié à chaque envoi employé' : 'Recevez une alerte quand un employé envoie ses chiffres'}</div>
           </div>
           ${isPushSubscribed()
@@ -1457,7 +1457,7 @@ const App = (() => {
       <title>${esc(pharmacy.name)} — ${fmtDate(S.date)}</title>
       <style>${PDF_CSS}</style></head><body>
       <div class="hd">
-        <h1>💊 ${esc(pharmacy.name)}</h1>
+        <h1>${esc(pharmacy.name)}</h1>
         <h2>Récapitulatif journalier</h2>
         <div class="meta">${fmtDateLong(S.date)} · Généré le ${fmtDate(today())}</div>
       </div>
@@ -1514,7 +1514,7 @@ const App = (() => {
       <title>${esc(pharmacy.name)} — ${fmtMonth(S.month)}</title>
       <style>${PDF_CSS}</style></head><body>
       <div class="hd">
-        <h1>💊 ${esc(pharmacy.name)}</h1>
+        <h1>${esc(pharmacy.name)}</h1>
         <h2>Résumé mensuel — ${fmtMonth(S.month)}</h2>
         <div class="meta">${t.dayCount} jour${t.dayCount!==1?'s':''} saisi${t.dayCount!==1?'s':''} · Généré le ${fmtDate(today())}</div>
       </div>
@@ -1523,12 +1523,12 @@ const App = (() => {
         <thead><tr><th>Poste</th><th class="num">Montant</th></tr></thead>
         <tbody>
           <tr><td class="bold">Total Sobrus</td><td class="num bold">${fmt(t.sobrus)}</td></tr>
-          <tr><td>💵 Espèce</td><td class="num">${fmt(t.espece)}</td></tr>
-          <tr><td>💳 TPE</td><td class="num">${fmt(t.tpe)}</td></tr>
-          <tr><td>🏦 Chèque</td><td class="num">${fmt(t.cheque)}</td></tr>
-          ${t.fourni>0?`<tr><td>🏭 Fournisseurs</td><td class="num">${fmt(t.fourni)}</td></tr>`:''}
-          ${t.depenses>0?`<tr><td>💸 Dépenses</td><td class="num">${fmt(t.depenses)}</td></tr>`:''}
-          ${t.remise>0?`<tr><td>🏷 Remises</td><td class="num">${fmt(t.remise)}</td></tr>`:''}
+          <tr><td>Espèce</td><td class="num">${fmt(t.espece)}</td></tr>
+          <tr><td>TPE</td><td class="num">${fmt(t.tpe)}</td></tr>
+          <tr><td>Chèque</td><td class="num">${fmt(t.cheque)}</td></tr>
+          ${t.fourni>0?`<tr><td>Fournisseurs</td><td class="num">${fmt(t.fourni)}</td></tr>`:''}
+          ${t.depenses>0?`<tr><td>Dépenses</td><td class="num">${fmt(t.depenses)}</td></tr>`:''}
+          ${t.remise>0?`<tr><td>Remises</td><td class="num">${fmt(t.remise)}</td></tr>`:''}
           <tr class="total"><td>Total Détail</td><td class="num">${fmt(tDetail)}</td></tr>
           <tr><td><span class="${t.ecartCount>0?'bad':'ok'}">${t.ecartCount>0?'⚠ Écarts ('+t.ecartCount+' caisse'+(t.ecartCount>1?'s':'')+')':'✓ Aucun écart'}</span></td>
             <td class="num ${t.ecartCount>0?'bad':'ok'}">${t.ecartCount>0?fmtD(t.ecartSum):''}</td></tr>
@@ -1581,14 +1581,14 @@ const App = (() => {
     const activeNoms = active.map(f => f.nom);
     const amountRows = active.map(f => `
       <div class="field-row">
-        <span class="field-label" style="font-size:14px">🏭 ${esc(f.nom)}</span>
+        <span class="field-label" style="font-size:14px">${esc(f.nom)}</span>
         <input type="number" class="field-input" placeholder="0,00"
           value="${esc(f.montant)}" step="0.01" min="0" inputmode="decimal"
           oninput="App.onFourniAmount('${pid}','${cid}','${f.nom}',this.value)">
       </div>`).join('');
     return `
       <div class="field-row fourni-chip-row">
-        <span class="field-label">🏭 Fournisseur</span>
+        <span class="field-label">Fournisseur</span>
         <div class="fourni-chips">
           ${FOURNISSEURS.map(nom => `
             <button class="fourni-chip ${activeNoms.includes(nom) ? 'active' : ''}"
