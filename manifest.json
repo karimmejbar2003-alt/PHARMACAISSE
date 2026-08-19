@@ -1,19 +1,25 @@
 {
-  "name": "CaissePharma",
-  "short_name": "CaissePharma",
-  "description": "Vérification journalière des caisses de pharmacie",
+  "name": "PharmaCaisse",
+  "short_name": "PharmaCaisse",
+  "description": "Réconciliation journalière des caisses de pharmacie",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#1e40af",
+  "background_color": "#F5F5F7",
+  "theme_color": "#00A650",
   "orientation": "any",
   "lang": "fr",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

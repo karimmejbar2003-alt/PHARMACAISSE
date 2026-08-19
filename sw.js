@@ -1,5 +1,6 @@
-const CACHE = 'caissepharma-v9';
-const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'firebase-config.js'];
+const CACHE = 'caissepharma-v10';
+const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json',
+                'icon-180.png', 'icon-192.png', 'icon-512.png', 'firebase-config.js'];
 
 self.addEventListener('install', e =>
   e.waitUntil(
