@@ -1,4 +1,4 @@
-/* CaissePharma — gestion des caisses de pharmacie */
+/* PharmaCaisse — iOS Design */
 const App = (() => {
 
   // ── FIREBASE ───────────────────────────────────────────────────────────
@@ -10,26 +10,25 @@ const App = (() => {
     try {
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       db = firebase.firestore();
-      // Cache local Firestore → fonctionne hors connexion
       db.enablePersistence({ synchronizeTabs: false }).catch(() => {});
-    } catch(e) { console.warn('Firebase init:', e.message); }
+    } catch(e) { console.warn('Firebase:', e.message); }
   }
 
   // ── STATE ──────────────────────────────────────────────────────────────
   const state = {
     pharmacies: [],
-    entries: {},   // key: "pharmacyId|YYYY-MM-DD" → { caisseId: {sobrus,espece,tpe,remise,remarque,savedAt} }
+    entries: {},
     pharmacyId: null,
     date: todayStr(),
-    view: 'day',          // day | history | histDetail | settings
+    view: 'day',
     detailPharmacyId: null,
     detailDate: null,
   };
 
+  const FOURNISSEURS = ['EXPERT', 'PARA2000', '2A PARA'];
+
   // ── HELPERS ────────────────────────────────────────────────────────────
-  function todayStr() {
-    return new Date().toISOString().split('T')[0];
-  }
+  function todayStr() { return new Date().toISOString().split('T')[0]; }
 
   function formatDate(d) {
     if (!d) return '';
@@ -37,8 +36,17 @@ const App = (() => {
     return `${day}/${m}/${y}`;
   }
 
+  function formatDateLong(d) {
+    if (!d) return '';
+    try {
+      return new Date(d + 'T12:00:00')
+        .toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+    } catch(e) { return formatDate(d); }
+  }
+
   function uid() {
-    return (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+    return crypto.randomUUID ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
   function num(v) {
@@ -47,27 +55,32 @@ const App = (() => {
   }
 
   const nf = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  function fmt(v)    { return nf.format(num(v)) + ' DH'; }
-  function fmtD(v)   { const n = num(v); return (n >= 0 ? '+' : '') + nf.format(n) + ' DH'; }
-  function esc(s)    { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function fmt(v)  { return nf.format(num(v)) + ' DH'; }
+  function fmtD(v) { const n = num(v); return (n >= 0 ? '+' : '') + nf.format(n) + ' DH'; }
+  function esc(s)  {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
+    catch(e) { return ''; }
+  }
 
   // ── STORAGE ────────────────────────────────────────────────────────────
   const STORE_KEY = 'caissepharma_v1';
 
   function saveLocal() {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ pharmacies: state.pharmacies, entries: state.entries }));
-    } catch(e) {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ pharmacies: state.pharmacies, entries: state.entries })); }
+    catch(e) {}
   }
 
   function loadLocal() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        state.pharmacies = d.pharmacies || [];
-        state.entries    = d.entries    || {};
-      }
+      if (raw) { const d = JSON.parse(raw); state.pharmacies = d.pharmacies || []; state.entries = d.entries || {}; }
     } catch(e) {}
   }
 
@@ -75,23 +88,21 @@ const App = (() => {
     if (state.pharmacies.length === 0) {
       state.pharmacies = [
         {
-          id: uid(),
-          name: 'Pharmacie AGDAL',
+          id: uid(), name: 'Pharmacie AGDAL',
           caisses: [
-            { id: uid(), name: 'Haj'   },
+            { id: uid(), name: 'Haj' },
             { id: uid(), name: 'Hasna' },
             { id: uid(), name: 'Kamal' },
           ]
         },
         {
-          id: uid(),
-          name: 'Pharmacie LES AMICALES',
+          id: uid(), name: 'Pharmacie LES AMICALES',
           caisses: [
-            { id: uid(), name: 'Zineb'   },
+            { id: uid(), name: 'Zineb' },
             { id: uid(), name: 'Khadija' },
             { id: uid(), name: 'Youssra' },
-            { id: uid(), name: 'Lehcen'  },
-            { id: uid(), name: 'Yamina'  },
+            { id: uid(), name: 'Lehcen' },
+            { id: uid(), name: 'Yamina' },
           ]
         }
       ];
@@ -99,22 +110,15 @@ const App = (() => {
     state.pharmacyId = state.pharmacies[0].id;
   }
 
-  // Sauvegarde localStorage (immédiat) + Firestore (cloud, arrière-plan)
   function save() {
     saveLocal();
-    if (db) {
-      db.doc(FS_DOC)
-        .set({ pharmacies: state.pharmacies, entries: state.entries })
-        .catch(e => console.warn('Firestore save:', e.message));
-    }
+    if (db) db.doc(FS_DOC).set({ pharmacies: state.pharmacies, entries: state.entries })
+      .catch(e => console.warn('Firestore save:', e.message));
   }
 
   async function load() {
-    // 1. Chargement local immédiat (affichage instantané)
     loadLocal();
     ensureDefaultPharmacy();
-
-    // 2. Synchronisation Firestore (cloud)
     if (db) {
       try {
         const snap = await db.doc(FS_DOC).get();
@@ -124,30 +128,29 @@ const App = (() => {
             state.pharmacies = d.pharmacies;
             state.entries    = d.entries || {};
             state.pharmacyId = state.pharmacies[0].id;
-            saveLocal(); // Met à jour le cache local
+            saveLocal();
           }
         } else {
-          // Première connexion : pousse les données locales vers Firestore
           await db.doc(FS_DOC).set({ pharmacies: state.pharmacies, entries: state.entries });
         }
-      } catch(e) {
-        console.warn('Firestore load (mode hors-ligne ?):', e.message);
-      }
+      } catch(e) { console.warn('Firestore load:', e.message); }
     }
   }
 
   // ── ENTRY ACCESS ───────────────────────────────────────────────────────
-  function entryKey(pid, date)    { return `${pid}|${date}`; }
-  function dayData(pid, date)     { return state.entries[entryKey(pid, date)] || {}; }
+  function entryKey(pid, date) { return `${pid}|${date}`; }
+  function dayData(pid, date)  { return state.entries[entryKey(pid, date)] || {}; }
 
-  function getEntry(pid, date, cid) {
-    return (dayData(pid, date))[cid] || { sobrus:'', espece:'', tpe:'', cheque:'', fournisseur_nom:'', fournisseur_montant:'', depenses:'', remise:'', remarque:'', savedAt:null };
+  function blank() {
+    return { sobrus:'', espece:'', tpe:'', cheque:'', fournisseur_nom:'', fournisseur_montant:'', depenses:'', remise:'', remarque:'', savedAt:null };
   }
+
+  function getEntry(pid, date, cid) { return (dayData(pid, date))[cid] || blank(); }
 
   function setField(pid, date, cid, field, value) {
     const k = entryKey(pid, date);
     if (!state.entries[k]) state.entries[k] = {};
-    if (!state.entries[k][cid]) state.entries[k][cid] = { sobrus:'', espece:'', tpe:'', cheque:'', fournisseur_nom:'', fournisseur_montant:'', depenses:'', remise:'', remarque:'', savedAt:null };
+    if (!state.entries[k][cid]) state.entries[k][cid] = blank();
     state.entries[k][cid][field] = value;
     save();
   }
@@ -176,38 +179,27 @@ const App = (() => {
     const pharmacy = state.pharmacies.find(p => p.id === state.pharmacyId);
     const isDetail = state.view === 'histDetail';
 
-    let headerTitle = 'CaissePharma';
-    let headerSub   = '';
-    let showBack    = false;
+    let navTitle = 'PharmaCaisse';
+    let showBack = false;
 
-    if (state.view === 'day') {
-      headerTitle = pharmacy?.name ?? 'CaissePharma';
-      headerSub   = formatDate(state.date);
-    } else if (state.view === 'history') {
-      headerTitle = 'Historique';
-    } else if (state.view === 'histDetail') {
-      const dp = state.pharmacies.find(p => p.id === state.detailPharmacyId);
-      headerTitle = dp?.name ?? 'Détail';
-      headerSub   = formatDate(state.detailDate);
-      showBack    = true;
-    } else if (state.view === 'settings') {
-      headerTitle = 'Réglages';
+    if (state.view === 'day')       navTitle = pharmacy?.name ?? 'PharmaCaisse';
+    if (state.view === 'history')   navTitle = 'Historique';
+    if (state.view === 'settings')  navTitle = 'Réglages';
+    if (state.view === 'histDetail') {
+      navTitle = formatDate(state.detailDate);
+      showBack = true;
     }
 
     document.getElementById('app').innerHTML = `
-      <div class="header">
-        <div class="header-inner">
-          ${showBack ? `<button class="btn-icon" onclick="App.back()" aria-label="Retour">‹</button>` : `
-          <div class="header-logo">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="8" y="2" width="4" height="16" rx="1.5" fill="white"/>
-              <rect x="2" y="8" width="16" height="4" rx="1.5" fill="white"/>
-            </svg>
-          </div>`}
-          <div class="header-text">
-            <div class="header-title">${esc(headerTitle)}</div>
-            ${headerSub ? `<div class="header-subtitle">${esc(headerSub)}</div>` : ''}
-          </div>
+      <div class="nav">
+        <div class="nav-inner">
+          ${showBack
+            ? `<button class="nav-back" onclick="App.back()">‹ Retour</button>`
+            : `<div style="width:44px"></div>`}
+          <div class="nav-title">${esc(navTitle)}</div>
+          ${!showBack
+            ? `<button class="nav-action" onclick="App.setView('settings')">Réglages</button>`
+            : `<div style="width:72px"></div>`}
         </div>
       </div>
 
@@ -215,218 +207,219 @@ const App = (() => {
         ${renderView(pharmacy)}
       </div>
 
-      <nav class="bottom-nav">
-        <button class="nav-item ${state.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">
-          <span class="nav-icon">📋</span>Saisie
+      <nav class="tabbar">
+        <button class="tab ${state.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">
+          <span class="tab-icon">📋</span>Saisie
         </button>
-        <button class="nav-item ${['history','histDetail'].includes(state.view) ? 'active' : ''}" onclick="App.setView('history')">
-          <span class="nav-icon">📅</span>Historique
+        <button class="tab ${['history','histDetail'].includes(state.view) ? 'active' : ''}" onclick="App.setView('history')">
+          <span class="tab-icon">📅</span>Historique
         </button>
-        <button class="nav-item ${state.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">
-          <span class="nav-icon">⚙️</span>Réglages
+        <button class="tab ${state.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">
+          <span class="tab-icon">⚙️</span>Réglages
         </button>
-      </nav>
-    `;
+      </nav>`;
 
     generateIcon();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
   function renderView(pharmacy) {
-    if (state.view === 'day')       return renderDay(pharmacy);
-    if (state.view === 'history')   return renderHistory(pharmacy);
+    if (state.view === 'day')        return renderDay(pharmacy);
+    if (state.view === 'history')    return renderHistory(pharmacy);
     if (state.view === 'histDetail') return renderDetail();
-    if (state.view === 'settings')  return renderSettings();
+    if (state.view === 'settings')   return renderSettings();
     return '';
+  }
+
+  // ── SEGMENTED CONTROL ──────────────────────────────────────────────────
+  function renderSegment() {
+    if (state.pharmacies.length <= 1) return '';
+    return `
+      <div class="segment-wrap">
+        <div class="segment">
+          ${state.pharmacies.map(p => `
+            <button class="seg-btn ${p.id === state.pharmacyId ? 'active' : ''}"
+              onclick="App.selectPharmacy('${p.id}')">
+              ${esc(p.name.replace(/pharmacie\s*/i, ''))}
+            </button>`).join('')}
+        </div>
+      </div>`;
   }
 
   // ── DAY VIEW ───────────────────────────────────────────────────────────
   function renderDay(pharmacy) {
     if (!pharmacy) return emptyState('🏥', 'Aucune pharmacie', 'Ajoutez-en une dans Réglages.');
 
-    const cards  = pharmacy.caisses.map((c, i) => renderCard(pharmacy, c, i)).join('');
-    const status = daySummary(pharmacy);
+    const status  = daySummary(pharmacy);
+    const isToday = state.date >= todayStr();
+    const cards   = pharmacy.caisses.map((c, i) => renderCard(pharmacy, c, i)).join('');
 
     return `
-      <div class="controls-bar">
-        <div class="pharma-select-wrap">
-          <select class="pharma-select" onchange="App.selectPharmacy(this.value)">
-            ${state.pharmacies.map(p => `<option value="${p.id}" ${p.id === state.pharmacyId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-          </select>
+      ${renderSegment()}
+
+      <div class="date-row">
+        <button class="date-arrow" onclick="App.prevDay()">‹</button>
+        <div class="date-center">
+          <div class="date-main">${formatDateLong(state.date)}</div>
+          <div class="date-sub">${status}</div>
         </div>
-        <input type="date" class="date-input" value="${state.date}" max="${todayStr()}"
-          onchange="App.changeDate(this.value)" aria-label="Date">
-        ${state.date !== todayStr() ? `<button class="btn-today" onclick="App.changeDate('${todayStr()}')">Auj.</button>` : ''}
+        <button class="date-arrow ${isToday ? 'off' : ''}" onclick="App.nextDay()">›</button>
       </div>
 
       <div class="save-all-bar">
-        <div class="day-summary">
-          <strong>${formatDate(state.date)}</strong><br>${status}
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="App.saveAll('${pharmacy.id}')">
-          💾 Tout sauvegarder
+        <button class="btn btn-blue btn-sm" onclick="App.saveAll('${pharmacy.id}')">
+          Tout sauvegarder
         </button>
       </div>
 
       <div class="caisse-grid">
         ${cards}
-      </div>
-    `;
+      </div>`;
   }
 
   function daySummary(pharmacy) {
-    let ok = 0, issues = 0, empty = 0;
+    let ok = 0, bad = 0, empty = 0;
     pharmacy.caisses.forEach(c => {
-      const e = getEntry(pharmacy.id, state.date, c.id);
-      const r = calc(e);
-      if (!r.hasData)      empty++;
-      else if (r.isValid)  ok++;
-      else                 issues++;
+      const r = calc(getEntry(pharmacy.id, state.date, c.id));
+      if (!r.hasData) empty++;
+      else if (r.isValid) ok++;
+      else bad++;
     });
     const parts = [];
-    if (ok     > 0) parts.push(`<span style="color:var(--green)">${ok} équilibrée${ok > 1 ? 's' : ''}</span>`);
-    if (issues > 0) parts.push(`<span style="color:var(--red)">${issues} écart${issues > 1 ? 's' : ''}</span>`);
-    if (empty  > 0) parts.push(`<span style="color:var(--gray-400)">${empty} non saisie${empty > 1 ? 's' : ''}</span>`);
+    if (ok   > 0) parts.push(`<span style="color:var(--green)">${ok} OK</span>`);
+    if (bad  > 0) parts.push(`<span style="color:var(--red)">${bad} écart${bad>1?'s':''}</span>`);
+    if (empty> 0) parts.push(`<span style="color:var(--label3)">${empty} vide${empty>1?'s':''}</span>`);
     return parts.join(' · ') || 'Aucune saisie';
   }
 
+  // ── CAISSE CARD ────────────────────────────────────────────────────────
   function renderCard(pharmacy, caisse, idx) {
     const entry = getEntry(pharmacy.id, state.date, caisse.id);
-    const c = calc(entry);
-    const pid = pharmacy.id;
-    const cid = caisse.id;
+    const c     = calc(entry);
+    const pid   = pharmacy.id;
+    const cid   = caisse.id;
 
-    const cardClass   = c.hasData ? (c.isValid ? 'valid' : 'invalid') : '';
-    const badgeClass  = c.hasData ? (c.isValid ? 'badge-valid' : 'badge-invalid') : 'badge-neutral';
-    const badgeText   = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente';
-
-    const showResult  = c.hasData;
-    const showDiff    = !c.isValid && c.hasData && c.sobrusEntered;
-
-    const savedInfo = entry.savedAt
-      ? `<span class="save-status">✓ Sauvegardé ${formatTime(entry.savedAt)}</span>`
-      : `<span class="save-status"></span>`;
+    const cardCls  = c.hasData ? (c.isValid ? 'ok' : 'bad') : '';
+    const badgeCls = c.hasData ? (c.isValid ? 'badge-ok' : 'badge-bad') : 'badge-n';
+    const badgeTxt = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : '—';
+    const showDiff = !c.isValid && c.hasData && c.sobrusEntered;
 
     return `
-    <div class="caisse-card ${cardClass}" id="card-${cid}" style="animation-delay:${idx*0.06}s">
-      <div class="caisse-head">
-        <div class="caisse-name">💊 ${esc(caisse.name)}</div>
-        <span class="badge ${badgeClass}" data-badge="${cid}">${badgeText}</span>
+    <div class="card ${cardCls}" id="card-${cid}" style="animation-delay:${idx*0.06}s">
+
+      <div class="card-hd">
+        <div class="card-name">💊 ${esc(caisse.name)}</div>
+        <span class="badge ${badgeCls}" id="badge-${cid}">${badgeTxt}</span>
       </div>
 
-      <div class="caisse-body">
-        <div class="field-label">🖥 Caisse Sobrus</div>
-        <input type="number" class="input-field input-sobrus"
+      <div class="sobrus-wrap">
+        <div class="sobrus-lbl">Caisse Sobrus</div>
+        <input type="number" class="sobrus-input"
           id="f-${cid}-sobrus"
-          placeholder="Montant affiché Sobrus"
+          placeholder="0,00"
           value="${esc(entry.sobrus)}"
           step="0.01" min="0" inputmode="decimal"
           oninput="App.onInput('${pid}','${cid}','sobrus',this.value)">
+      </div>
 
-        <div class="sep">Détail caisse</div>
+      <div class="inner-lbl">Détail caisse</div>
 
-        <div class="trio">
-          <div>
-            <div class="field-label">💵 Espèce</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-espece"
-              placeholder="0,00"
-              value="${esc(entry.espece)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','espece',this.value)">
-          </div>
-          <div>
-            <div class="field-label">💳 TPE</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-tpe"
-              placeholder="0,00"
-              value="${esc(entry.tpe)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','tpe',this.value)">
-          </div>
-          <div>
-            <div class="field-label">🏦 Chèque</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-cheque"
-              placeholder="0,00"
-              value="${esc(entry.cheque)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
-          </div>
-        </div>
+      <div class="frow">
+        <span class="frow-lbl">💵 Espèce</span>
+        <input type="number" class="frow-inp"
+          id="f-${cid}-espece" placeholder="0,00"
+          value="${esc(entry.espece)}"
+          step="0.01" min="0" inputmode="decimal"
+          oninput="App.onInput('${pid}','${cid}','espece',this.value)">
+      </div>
 
-        <div class="fournisseur-row">
-          <div>
-            <div class="field-label">🏭 Fournisseur</div>
-            <select class="select-field"
-              id="f-${cid}-fournisseur_nom"
-              onchange="App.onInput('${pid}','${cid}','fournisseur_nom',this.value)">
-              <option value="">— Aucun —</option>
-              ${['EXPERT','PARA2000','2A PARA'].map(n => `<option value="${n}" ${entry.fournisseur_nom === n ? 'selected' : ''}>${n}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <div class="field-label">💰 Montant</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-fournisseur_montant"
-              placeholder="0,00"
-              value="${esc(entry.fournisseur_montant)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','fournisseur_montant',this.value)">
-          </div>
-        </div>
+      <div class="frow">
+        <span class="frow-lbl">💳 TPE</span>
+        <input type="number" class="frow-inp"
+          id="f-${cid}-tpe" placeholder="0,00"
+          value="${esc(entry.tpe)}"
+          step="0.01" min="0" inputmode="decimal"
+          oninput="App.onInput('${pid}','${cid}','tpe',this.value)">
+      </div>
 
-        <div class="duo">
-          <div>
-            <div class="field-label">💸 Dépenses</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-depenses"
-              placeholder="0,00"
-              value="${esc(entry.depenses)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','depenses',this.value)">
-          </div>
-          <div>
-            <div class="field-label">🏷 Remise</div>
-            <input type="number" class="input-field"
-              id="f-${cid}-remise"
-              placeholder="0,00"
-              value="${esc(entry.remise)}"
-              step="0.01" min="0" inputmode="decimal"
-              oninput="App.onInput('${pid}','${cid}','remise',this.value)">
-          </div>
-        </div>
+      <div class="frow">
+        <span class="frow-lbl">🏦 Chèque</span>
+        <input type="number" class="frow-inp"
+          id="f-${cid}-cheque" placeholder="0,00"
+          value="${esc(entry.cheque)}"
+          step="0.01" min="0" inputmode="decimal"
+          oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
+      </div>
 
-        <div class="result-section ${showResult ? 'show' : ''}" id="res-${cid}">
-          <div class="result-box">
-            <div class="result-row">
-              <span>Total détail</span>
-              <span style="font-weight:600" id="rtotal-${cid}">${fmt(c.total)}</span>
-            </div>
-            <div class="result-row total ${c.isValid ? 'ok' : 'bad'}" id="rcomp-${cid}">
-              <span id="rcomp-label-${cid}">${c.isValid ? '✓ Équilibré' : '✗ Total Sobrus'}</span>
-              <span id="rcomp-val-${cid}">${fmt(c.sobrus)}</span>
-            </div>
-          </div>
-          <div class="diff-alert ${showDiff ? '' : 'hidden'}" id="diff-${cid}" style="${showDiff ? '' : 'display:none'}">
-            ⚠️ Écart&nbsp;: <span id="diffval-${cid}">${fmtD(c.diff)}</span>
-          </div>
-        </div>
-
-        <div class="remarque-wrap">
-          <div class="field-label" id="rlabel-${cid}">📝 Remarque${showDiff ? ' <span style="color:var(--red)">· requis si écart</span>' : ''}</div>
-          <textarea class="remarque-field"
-            id="f-${cid}-remarque"
-            placeholder="Cause de l'écart, observations…"
-            oninput="App.onInput('${pid}','${cid}','remarque',this.value)"
-          >${esc(entry.remarque)}</textarea>
+      <div class="frow">
+        <span class="frow-lbl">🏭 Fournisseur</span>
+        <div class="fourni-right">
+          <select class="fourni-select"
+            id="f-${cid}-fournisseur_nom"
+            onchange="App.onInput('${pid}','${cid}','fournisseur_nom',this.value)">
+            <option value="">Aucun</option>
+            ${FOURNISSEURS.map(n => `<option value="${n}" ${entry.fournisseur_nom === n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+          <input type="number" class="fourni-inp"
+            id="f-${cid}-fournisseur_montant" placeholder="0,00"
+            value="${esc(entry.fournisseur_montant)}"
+            step="0.01" min="0" inputmode="decimal"
+            oninput="App.onInput('${pid}','${cid}','fournisseur_montant',this.value)">
         </div>
       </div>
 
-      <div class="caisse-foot">
-        ${savedInfo}
-        <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
-          💾 Sauvegarder
+      <div class="frow">
+        <span class="frow-lbl">💸 Dépenses</span>
+        <input type="number" class="frow-inp"
+          id="f-${cid}-depenses" placeholder="0,00"
+          value="${esc(entry.depenses)}"
+          step="0.01" min="0" inputmode="decimal"
+          oninput="App.onInput('${pid}','${cid}','depenses',this.value)">
+      </div>
+
+      <div class="frow" style="border-bottom:none">
+        <span class="frow-lbl">🏷 Remise</span>
+        <input type="number" class="frow-inp"
+          id="f-${cid}-remise" placeholder="0,00"
+          value="${esc(entry.remise)}"
+          step="0.01" min="0" inputmode="decimal"
+          oninput="App.onInput('${pid}','${cid}','remise',this.value)">
+      </div>
+
+      <div class="result-sec ${c.hasData ? 'on' : ''}" id="res-${cid}">
+        <div class="result-bg">
+          <div class="result-row">
+            <span>Total détail</span>
+            <span id="rtotal-${cid}">${fmt(c.total)}</span>
+          </div>
+          <div class="result-row total ${c.isValid ? 'ok' : 'bad'}" id="rcomp-${cid}">
+            <span id="rcomp-label-${cid}">${c.isValid ? '✓ Équilibré avec Sobrus' : '✗ Sobrus attendu'}</span>
+            <span id="rcomp-val-${cid}">${fmt(c.sobrus)}</span>
+          </div>
+        </div>
+        <div class="diff-row" id="diff-${cid}" style="${showDiff ? '' : 'display:none'}">
+          <span>⚠️ Écart</span>
+          <span id="diffval-${cid}">${showDiff ? fmtD(c.diff) : ''}</span>
+        </div>
+      </div>
+
+      <div class="remarque-wrap">
+        <div class="remarque-lbl" id="rlabel-${cid}">
+          Remarque${showDiff ? ' · Requis si écart' : ''}
+        </div>
+        <textarea class="remarque-inp"
+          id="f-${cid}-remarque"
+          placeholder="Cause de l'écart, observations…"
+          oninput="App.onInput('${pid}','${cid}','remarque',this.value)"
+        >${esc(entry.remarque)}</textarea>
+      </div>
+
+      <div class="card-ft">
+        <span class="card-ft-status" id="ft-status-${cid}">
+          ${entry.savedAt ? `✓ Sauvegardé ${formatTime(entry.savedAt)}` : ''}
+        </span>
+        <button class="btn btn-blue btn-sm" onclick="App.saveCard('${pid}','${cid}')">
+          Sauvegarder
         </button>
       </div>
     </div>`;
@@ -434,52 +427,47 @@ const App = (() => {
 
   // ── CARD LIVE UPDATE ───────────────────────────────────────────────────
   function updateCard(pid, cid) {
-    const entry  = getEntry(pid, state.date, cid);
-    const c      = calc(entry);
-    const card   = document.getElementById(`card-${cid}`);
+    const entry = getEntry(pid, state.date, cid);
+    const c     = calc(entry);
+    const card  = document.getElementById(`card-${cid}`);
     if (!card) return;
 
-    // Border
-    card.className = `caisse-card ${c.hasData ? (c.isValid ? 'valid' : 'invalid') : ''}`;
+    card.className = `card ${c.hasData ? (c.isValid ? 'ok' : 'bad') : ''}`;
 
-    // Badge
-    const badge = document.querySelector(`[data-badge="${cid}"]`);
+    const badge = document.getElementById(`badge-${cid}`);
     if (badge) {
-      badge.className = `badge ${c.hasData ? (c.isValid ? 'badge-valid' : 'badge-invalid') : 'badge-neutral'}`;
-      badge.textContent = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente';
+      badge.className = `badge ${c.hasData ? (c.isValid ? 'badge-ok' : 'badge-bad') : 'badge-n'}`;
+      badge.textContent = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : '—';
     }
 
-    // Result section
     const res = document.getElementById(`res-${cid}`);
     if (res) {
-      res.className = `result-section ${c.hasData ? 'show' : ''}`;
-      const rtotal = document.getElementById(`rtotal-${cid}`);
-      if (rtotal) rtotal.textContent = fmt(c.total);
-      const rcomp = document.getElementById(`rcomp-${cid}`);
-      if (rcomp) {
-        rcomp.className = `result-row total ${c.isValid ? 'ok' : 'bad'}`;
-        document.getElementById(`rcomp-label-${cid}`).textContent = c.isValid ? '✓ Équilibré' : '✗ Total Sobrus';
+      res.className = `result-sec ${c.hasData ? 'on' : ''}`;
+      const rt = document.getElementById(`rtotal-${cid}`);
+      if (rt) rt.textContent = fmt(c.total);
+      const rc = document.getElementById(`rcomp-${cid}`);
+      if (rc) {
+        rc.className = `result-row total ${c.isValid ? 'ok' : 'bad'}`;
+        document.getElementById(`rcomp-label-${cid}`).textContent = c.isValid ? '✓ Équilibré avec Sobrus' : '✗ Sobrus attendu';
         document.getElementById(`rcomp-val-${cid}`).textContent   = fmt(c.sobrus);
       }
     }
 
-    // Diff
-    const diff    = document.getElementById(`diff-${cid}`);
     const showDiff = !c.isValid && c.hasData && c.sobrusEntered;
+    const diff = document.getElementById(`diff-${cid}`);
     if (diff) {
       diff.style.display = showDiff ? '' : 'none';
       const dv = document.getElementById(`diffval-${cid}`);
-      if (dv) dv.textContent = fmtD(c.diff);
+      if (dv) dv.textContent = showDiff ? fmtD(c.diff) : '';
     }
 
-    // Remarque label
     const rl = document.getElementById(`rlabel-${cid}`);
-    if (rl) rl.innerHTML = `📝 Remarque${showDiff ? ' <span style="color:var(--red)">· requis si écart</span>' : ''}`;
+    if (rl) rl.textContent = `Remarque${showDiff ? ' · Requis si écart' : ''}`;
   }
 
-  // ── HISTORY VIEW ───────────────────────────────────────────────────────
+  // ── HISTORY ────────────────────────────────────────────────────────────
   function renderHistory(pharmacy) {
-    if (!pharmacy) return emptyState('📅', 'Aucune pharmacie', 'Ajoutez-en une dans Réglages.');
+    if (!pharmacy) return emptyState('📅', 'Aucune pharmacie', '');
 
     const prefix = `${pharmacy.id}|`;
     const dates  = Object.keys(state.entries)
@@ -487,43 +475,34 @@ const App = (() => {
       .map(k => k.slice(prefix.length))
       .sort().reverse();
 
-    const selector = `
-      <div class="controls-bar" style="margin-bottom:16px">
-        <div class="pharma-select-wrap" style="flex:1">
-          <select class="pharma-select" onchange="App.selectPharmacy(this.value)">
-            ${state.pharmacies.map(p => `<option value="${p.id}" ${p.id === state.pharmacyId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-          </select>
-        </div>
-      </div>`;
+    const seg = renderSegment();
 
-    if (dates.length === 0) {
-      return selector + emptyState('📅', 'Aucun historique', 'Les saisies sauvegardées apparaîtront ici.');
-    }
+    if (dates.length === 0) return seg + emptyState('📅', 'Aucun historique', 'Les saisies apparaîtront ici une fois sauvegardées.');
 
     const items = dates.map(date => {
-      const day     = dayData(pharmacy.id, date);
-      const entries = Object.values(day);
-      const count   = entries.length;
-      const issues  = entries.filter(e => { const r = calc(e); return r.hasData && !r.isValid; }).length;
-      const allOk   = count > 0 && entries.every(e => calc(e).isValid);
-      const dotClass = allOk ? 'dot-ok' : issues > 0 ? 'dot-issue' : 'dot-partial';
-      const label    = allOk ? 'Tout équilibré' : issues > 0 ? `${issues} écart${issues>1?'s':''}` : 'En cours';
+      const day    = dayData(pharmacy.id, date);
+      const vals   = Object.values(day);
+      const count  = vals.length;
+      const bad    = vals.filter(e => { const r = calc(e); return r.hasData && !r.isValid; }).length;
+      const allOk  = count > 0 && vals.every(e => calc(e).isValid);
+      const dotCls = allOk ? 'dot-g' : bad > 0 ? 'dot-r' : 'dot-o';
+      const label  = allOk ? 'Tout équilibré' : bad > 0 ? `${bad} écart${bad>1?'s':''}` : 'En cours';
 
       return `
-        <div class="history-item" onclick="App.showDetail('${pharmacy.id}','${date}')">
-          <div class="status-dot ${dotClass}"></div>
+        <div class="ios-li" onclick="App.showDetail('${pharmacy.id}','${date}')">
+          <div class="dot ${dotCls}"></div>
           <div>
-            <div class="history-date">${formatDate(date)}</div>
-            <div class="history-sub">${count} caisse${count>1?'s':''} · ${label}</div>
+            <div class="li-main">${formatDate(date)}</div>
+            <div class="li-sub">${count} caisse${count>1?'s':''} · ${label}</div>
           </div>
-          <div class="chevron">›</div>
+          <div class="li-chev">›</div>
         </div>`;
     }).join('');
 
-    return selector + `<div class="section-title">Journées archivées</div><div class="history-list">${items}</div>`;
+    return `${seg}<div class="sec-hd">Journées archivées</div><div class="ios-list">${items}</div>`;
   }
 
-  // ── DETAIL VIEW ────────────────────────────────────────────────────────
+  // ── HISTORY DETAIL ─────────────────────────────────────────────────────
   function renderDetail() {
     const pharmacy = state.pharmacies.find(p => p.id === state.detailPharmacyId);
     if (!pharmacy) return emptyState('📅', 'Données introuvables', '');
@@ -534,35 +513,33 @@ const App = (() => {
       if (!entry) return '';
       const c = calc(entry);
       return `
-        <div class="detail-card ${c.isValid ? 'valid' : c.hasData ? 'invalid' : ''}">
-          <div class="detail-head">
-            <div class="detail-name">💊 ${esc(caisse.name)}</div>
-            <span class="badge ${c.isValid ? 'badge-valid' : c.hasData ? 'badge-invalid' : 'badge-neutral'}">
+        <div class="det-card ${c.isValid ? 'ok' : c.hasData ? 'bad' : ''}">
+          <div class="det-hd">
+            <div class="det-name">💊 ${esc(caisse.name)}</div>
+            <span class="badge ${c.isValid ? 'badge-ok' : c.hasData ? 'badge-bad' : 'badge-n'}">
               ${c.isValid ? '✓ Équilibré' : c.hasData ? '✗ Écart' : 'Non saisi'}
             </span>
           </div>
-          <div class="detail-body">
-            <div class="detail-row"><span class="detail-key">Caisse Sobrus</span><span class="detail-val">${fmt(c.sobrus)}</span></div>
-            <div class="detail-row"><span class="detail-key">Espèce</span><span class="detail-val">${fmt(c.espece)}</span></div>
-            <div class="detail-row"><span class="detail-key">TPE</span><span class="detail-val">${fmt(c.tpe)}</span></div>
-            <div class="detail-row"><span class="detail-key">Chèque</span><span class="detail-val">${fmt(c.cheque)}</span></div>
-            ${(entry.fournisseur_nom || c.fourni > 0) ? `<div class="detail-row"><span class="detail-key">Fournisseur</span><span class="detail-val">${entry.fournisseur_nom ? esc(entry.fournisseur_nom) + ' · ' : ''}${fmt(c.fourni)}</span></div>` : ''}
-            <div class="detail-row"><span class="detail-key">Dépenses</span><span class="detail-val">${fmt(c.depenses)}</span></div>
-            <div class="detail-row"><span class="detail-key">Remise</span><span class="detail-val">${fmt(c.remise)}</span></div>
-            <div class="detail-row" style="margin-top:6px;padding-top:10px;border-top:2px solid var(--gray-200)">
-              <span class="detail-key" style="font-weight:600">Total</span>
-              <span class="detail-val ${c.isValid ? '' : 'bad'}" style="color:${c.isValid?'var(--green)':'var(--red)'}">${fmt(c.total)}</span>
-            </div>
-            ${!c.isValid && c.hasData ? `
-              <div class="diff-alert" style="margin-top:10px">⚠️ Écart&nbsp;: ${fmtD(c.diff)}</div>` : ''}
-            ${entry.remarque ? `
-              <div class="detail-remarque"><strong>📝 Remarque :</strong> ${esc(entry.remarque)}</div>` : ''}
+          <div class="det-row"><span class="det-key">Caisse Sobrus</span><span class="det-val">${fmt(c.sobrus)}</span></div>
+          <div class="det-row"><span class="det-key">Espèce</span><span class="det-val">${fmt(c.espece)}</span></div>
+          <div class="det-row"><span class="det-key">TPE</span><span class="det-val">${fmt(c.tpe)}</span></div>
+          <div class="det-row"><span class="det-key">Chèque</span><span class="det-val">${fmt(c.cheque)}</span></div>
+          ${(entry.fournisseur_nom || c.fourni > 0) ? `<div class="det-row"><span class="det-key">Fournisseur</span><span class="det-val">${entry.fournisseur_nom ? esc(entry.fournisseur_nom) + ' · ' : ''}${fmt(c.fourni)}</span></div>` : ''}
+          <div class="det-row"><span class="det-key">Dépenses</span><span class="det-val">${fmt(c.depenses)}</span></div>
+          <div class="det-row"><span class="det-key">Remise</span><span class="det-val">${fmt(c.remise)}</span></div>
+          <div class="det-row" style="border-top:1.5px solid var(--sep-l);margin-top:2px;padding-top:12px">
+            <span class="det-key" style="font-weight:600">Total</span>
+            <span class="det-val ${c.isValid ? 'g' : 'r'}">${fmt(c.total)}</span>
           </div>
+          ${!c.isValid && c.hasData ? `<div class="diff-row" style="margin:0;border-radius:0">
+            <span>⚠️ Écart</span><span>${fmtD(c.diff)}</span>
+          </div>` : ''}
+          ${entry.remarque ? `<div class="det-remarque"><strong>📝</strong> ${esc(entry.remarque)}</div>` : ''}
         </div>`;
     }).filter(Boolean).join('');
 
     return `
-      <div class="section-title" style="margin-bottom:14px">${esc(pharmacy.name)} — ${formatDate(state.detailDate)}</div>
+      <div class="sec-hd">${esc(pharmacy.name)}</div>
       ${cards || emptyState('📋', 'Aucune donnée', '')}`;
   }
 
@@ -570,67 +547,66 @@ const App = (() => {
   function renderSettings() {
     const sections = state.pharmacies.map(p => {
       const rows = p.caisses.map(c => `
-        <div class="settings-row">
-          <div class="settings-label">💊 ${esc(c.name)}</div>
-          <div style="display:flex;gap:7px">
-            <button class="btn btn-outline btn-sm" onclick="App.renameCaisse('${p.id}','${c.id}')">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="App.deleteCaisse('${p.id}','${c.id}')">🗑</button>
+        <div class="set-row">
+          <span class="set-lbl">💊 ${esc(c.name)}</span>
+          <div class="set-btns">
+            <button class="btn btn-gray btn-sm" onclick="App.renameCaisse('${p.id}','${c.id}')">✏️</button>
+            <button class="btn btn-red btn-sm" onclick="App.deleteCaisse('${p.id}','${c.id}')">🗑</button>
           </div>
         </div>`).join('');
 
       return `
-        <div class="settings-card">
-          <div class="settings-card-head">
-            <span class="ph-name">🏥 ${esc(p.name)}</span>
-            <button class="btn btn-outline btn-sm" onclick="App.renamePharmacy('${p.id}')">✏️ Renommer</button>
-            ${state.pharmacies.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="App.deletePharmacy('${p.id}')">🗑</button>` : ''}
+        <div class="set-card">
+          <div class="set-hd">
+            <span class="set-hd-name">🏥 ${esc(p.name)}</span>
+            <button class="btn btn-gray btn-sm" onclick="App.renamePharmacy('${p.id}')">✏️ Renommer</button>
+            ${state.pharmacies.length > 1 ? `<button class="btn btn-red btn-sm" onclick="App.deletePharmacy('${p.id}')">🗑</button>` : ''}
           </div>
           ${rows}
-          <div class="settings-row">
-            <button class="btn btn-outline btn-sm" onclick="App.addCaisse('${p.id}')">+ Ajouter une caisse</button>
+          <div class="set-row">
+            <button class="btn btn-ghost btn-sm" onclick="App.addCaisse('${p.id}')">+ Ajouter une caisse</button>
           </div>
         </div>`;
     }).join('');
 
     return `
+      <div class="sec-hd">Pharmacies</div>
       ${sections}
-
-      <button class="btn btn-primary btn-full" style="margin-bottom:24px" onclick="App.addPharmacy()">
-        🏥 Ajouter une pharmacie
-      </button>
-
-      <div class="settings-card">
-        <div class="settings-card-head">Sauvegarde & Export</div>
-        <div class="settings-row">
-          <div><div class="settings-label">Exporter les données</div><div class="settings-sub">Fichier JSON de sauvegarde</div></div>
-          <button class="btn btn-outline btn-sm" onclick="App.exportData()">📤 Export</button>
-        </div>
-        <div class="settings-row">
-          <div><div class="settings-label">Importer des données</div><div class="settings-sub">Restaurer depuis JSON</div></div>
-          <button class="btn btn-outline btn-sm" onclick="App.importData()">📥 Import</button>
-        </div>
+      <div style="padding:0 16px 16px">
+        <button class="btn btn-blue btn-full btn-lg" onclick="App.addPharmacy()">
+          🏥 Ajouter une pharmacie
+        </button>
       </div>
 
-      <div style="text-align:center;color:var(--gray-400);font-size:13px;padding:16px 0">
-        CaissePharma · Données stockées localement
+      <div class="sec-hd">Données</div>
+      <div class="set-card">
+        <div class="set-row">
+          <div>
+            <div class="set-lbl">Exporter</div>
+            <div class="set-sub">Télécharger une sauvegarde JSON</div>
+          </div>
+          <button class="btn btn-gray btn-sm" onclick="App.exportData()">📤 Export</button>
+        </div>
+        <div class="set-row">
+          <div>
+            <div class="set-lbl">Importer</div>
+            <div class="set-sub">Restaurer depuis un fichier JSON</div>
+          </div>
+          <button class="btn btn-gray btn-sm" onclick="App.importData()">📥 Import</button>
+        </div>
+      </div>
+      <div style="text-align:center;color:var(--label2);font-size:13px;padding:12px 0 24px">
+        PharmaCaisse · Données stockées localement et dans Firebase
       </div>`;
   }
 
-  // ── HELPERS ─────────────────────────────────────────────────────────────
+  // ── EMPTY STATE ────────────────────────────────────────────────────────
   function emptyState(icon, title, text) {
-    return `<div class="empty-state">
+    return `<div class="empty">
       <div class="empty-icon">${icon}</div>
       <div class="empty-title">${title}</div>
-      ${text ? `<div class="empty-text">${text}</div>` : ''}
+      ${text ? `<div class="empty-txt">${text}</div>` : ''}
     </div>`;
-  }
-
-  function formatTime(iso) {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    } catch(e) { return ''; }
   }
 
   // ── ICON GENERATION ────────────────────────────────────────────────────
@@ -641,18 +617,13 @@ const App = (() => {
       cv.width = cv.height = 180;
       const x = cv.getContext('2d');
       const r = 30;
-      x.fillStyle = '#1e40af';
+      x.fillStyle = '#007AFF';
       x.beginPath();
-      x.moveTo(r, 0); x.lineTo(180-r, 0);
-      x.arcTo(180, 0, 180, r, r);
-      x.lineTo(180, 180-r);
-      x.arcTo(180, 180, 180-r, 180, r);
-      x.lineTo(r, 180);
-      x.arcTo(0, 180, 0, 180-r, r);
-      x.lineTo(0, r);
-      x.arcTo(0, 0, r, 0, r);
-      x.closePath();
-      x.fill();
+      x.moveTo(r,0); x.lineTo(180-r,0);
+      x.arcTo(180,0,180,r,r); x.lineTo(180,180-r);
+      x.arcTo(180,180,180-r,180,r); x.lineTo(r,180);
+      x.arcTo(0,180,0,180-r,r); x.lineTo(0,r);
+      x.arcTo(0,0,r,0,r); x.closePath(); x.fill();
       x.fillStyle = 'white';
       x.fillRect(70, 32, 40, 116);
       x.fillRect(32, 70, 116, 40);
@@ -663,28 +634,26 @@ const App = (() => {
     } catch(e) {}
   }
 
-  // ── MODAL ──────────────────────────────────────────────────────────────
+  // ── BOTTOM SHEET MODAL ─────────────────────────────────────────────────
   function showModal({ title, placeholder, value = '', onConfirm }) {
     removeModal();
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'sheet-overlay';
     overlay.id = 'modal-overlay';
     overlay.innerHTML = `
-      <div class="modal">
-        <div class="modal-title">${esc(title)}</div>
-        <input class="modal-input" type="text" placeholder="${esc(placeholder)}" value="${esc(value)}" id="modal-inp" autocomplete="off">
-        <div class="modal-actions">
-          <button class="btn btn-outline" onclick="App.removeModal()">Annuler</button>
-          <button class="btn btn-primary" id="modal-ok">Confirmer</button>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">${esc(title)}</div>
+        <input class="sheet-inp" type="text" placeholder="${esc(placeholder)}" value="${esc(value)}" id="modal-inp" autocomplete="off">
+        <div class="sheet-acts">
+          <button class="sheet-btn cancel" onclick="App.removeModal()">Annuler</button>
+          <button class="sheet-btn confirm" id="modal-ok">Confirmer</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
     const inp = overlay.querySelector('#modal-inp');
     inp.focus(); inp.select();
-    const confirm = () => {
-      const v = inp.value.trim();
-      if (v) { onConfirm(v); removeModal(); }
-    };
+    const confirm = () => { const v = inp.value.trim(); if (v) { onConfirm(v); removeModal(); } };
     overlay.querySelector('#modal-ok').onclick = confirm;
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter') confirm();
@@ -693,18 +662,19 @@ const App = (() => {
     overlay.addEventListener('pointerdown', e => { if (e.target === overlay) removeModal(); });
   }
 
-  function showConfirm({ title, message, onConfirm, danger = true }) {
+  function showConfirm({ title, message, onConfirm }) {
     removeModal();
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'sheet-overlay';
     overlay.id = 'modal-overlay';
     overlay.innerHTML = `
-      <div class="modal">
-        <div class="modal-title">${esc(title)}</div>
-        <p style="color:var(--gray-500);margin-bottom:18px;font-size:15px">${esc(message)}</p>
-        <div class="modal-actions">
-          <button class="btn btn-outline" onclick="App.removeModal()">Annuler</button>
-          <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="modal-ok">${danger ? '🗑 Supprimer' : 'Confirmer'}</button>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">${esc(title)}</div>
+        <div class="sheet-msg">${esc(message)}</div>
+        <div class="sheet-acts">
+          <button class="sheet-btn cancel" onclick="App.removeModal()">Annuler</button>
+          <button class="sheet-btn danger" id="modal-ok">Supprimer</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -712,42 +682,41 @@ const App = (() => {
     overlay.addEventListener('pointerdown', e => { if (e.target === overlay) removeModal(); });
   }
 
-  function removeModal() {
-    document.getElementById('modal-overlay')?.remove();
-  }
+  function removeModal() { document.getElementById('modal-overlay')?.remove(); }
 
   // ── TOAST ──────────────────────────────────────────────────────────────
-  let _toastTimer;
+  let _tt;
   function toast(msg) {
     const el = document.getElementById('toast');
     if (!el) return;
     el.textContent = msg;
     el.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+    clearTimeout(_tt);
+    _tt = setTimeout(() => el.classList.remove('show'), 2400);
   }
 
-  // ── PUBLIC ACTIONS ─────────────────────────────────────────────────────
-  function setView(v) {
-    state.view = v;
-    render();
-    window.scrollTo(0, 0);
-  }
+  // ── NAVIGATION ACTIONS ─────────────────────────────────────────────────
+  function setView(v) { state.view = v; render(); window.scrollTo(0, 0); }
+  function back()     { if (state.view === 'histDetail') { state.view = 'history'; render(); } }
 
-  function back() {
-    if (state.view === 'histDetail') { state.view = 'history'; render(); }
-  }
-
-  function selectPharmacy(id) {
-    state.pharmacyId = id;
+  function prevDay() {
+    const d = new Date(state.date + 'T12:00:00');
+    d.setDate(d.getDate() - 1);
+    state.date = d.toISOString().split('T')[0];
     render();
   }
 
-  function changeDate(d) {
-    state.date = d;
+  function nextDay() {
+    if (state.date >= todayStr()) return;
+    const d = new Date(state.date + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    state.date = d.toISOString().split('T')[0];
     render();
   }
 
+  function selectPharmacy(id) { state.pharmacyId = id; render(); }
+
+  // ── FIELD ACTIONS ──────────────────────────────────────────────────────
   function onInput(pid, cid, field, value) {
     setField(pid, state.date, cid, field, value);
     updateCard(pid, cid);
@@ -756,43 +725,36 @@ const App = (() => {
   function saveCard(pid, cid) {
     const k = entryKey(pid, state.date);
     if (!state.entries[k]) state.entries[k] = {};
-    if (!state.entries[k][cid]) state.entries[k][cid] = { sobrus:'', espece:'', tpe:'', cheque:'', fournisseur_nom:'', fournisseur_montant:'', depenses:'', remise:'', remarque:'' };
+    if (!state.entries[k][cid]) state.entries[k][cid] = blank();
     state.entries[k][cid].savedAt = new Date().toISOString();
     save();
     toast('✓ Sauvegardé');
-    const foot = document.querySelector(`#card-${cid} .caisse-foot .save-status`);
-    if (foot) {
-      const t = formatTime(state.entries[k][cid].savedAt);
-      foot.textContent = `✓ Sauvegardé ${t}`;
-    }
+    const ft = document.getElementById(`ft-status-${cid}`);
+    if (ft) ft.textContent = `✓ Sauvegardé ${formatTime(state.entries[k][cid].savedAt)}`;
   }
 
   function saveAll(pid) {
     const pharmacy = state.pharmacies.find(p => p.id === pid);
     if (!pharmacy) return;
     pharmacy.caisses.forEach(c => saveCard(pid, c.id));
-    toast(`✓ Tout sauvegardé (${pharmacy.caisses.length} caisses)`);
+    toast(`✓ ${pharmacy.caisses.length} caisses sauvegardées`);
   }
 
   function showDetail(pid, date) {
     state.detailPharmacyId = pid;
     state.detailDate = date;
     state.view = 'histDetail';
-    render();
-    window.scrollTo(0, 0);
+    render(); window.scrollTo(0, 0);
   }
 
   // ── PHARMACY CRUD ──────────────────────────────────────────────────────
   function addPharmacy() {
-    showModal({
-      title: 'Nouvelle pharmacie',
-      placeholder: 'Nom de la pharmacie',
+    showModal({ title: 'Nouvelle pharmacie', placeholder: 'Nom de la pharmacie',
       onConfirm: name => {
         const pid = uid();
         state.pharmacies.push({ id: pid, name, caisses: [{ id: uid(), name: 'Caisse 1' }] });
         state.pharmacyId = pid;
-        save(); render();
-        toast('✓ Pharmacie créée');
+        save(); render(); toast('✓ Pharmacie créée');
       }
     });
   }
@@ -800,10 +762,7 @@ const App = (() => {
   function renamePharmacy(pid) {
     const p = state.pharmacies.find(x => x.id === pid);
     if (!p) return;
-    showModal({
-      title: 'Renommer la pharmacie',
-      placeholder: 'Nouveau nom',
-      value: p.name,
+    showModal({ title: 'Renommer la pharmacie', placeholder: 'Nouveau nom', value: p.name,
       onConfirm: name => { p.name = name; save(); render(); }
     });
   }
@@ -811,30 +770,24 @@ const App = (() => {
   function deletePharmacy(pid) {
     const p = state.pharmacies.find(x => x.id === pid);
     if (!p) return;
-    showConfirm({
-      title: 'Supprimer la pharmacie ?',
-      message: `Toutes les données de "${p.name}" seront définitivement supprimées.`,
+    showConfirm({ title: 'Supprimer la pharmacie ?', message: `Toutes les données de "${p.name}" seront supprimées.`,
       onConfirm: () => {
         state.pharmacies = state.pharmacies.filter(x => x.id !== pid);
         Object.keys(state.entries).forEach(k => { if (k.startsWith(pid + '|')) delete state.entries[k]; });
         state.pharmacyId = state.pharmacies[0]?.id ?? null;
-        save(); render();
-        toast('Pharmacie supprimée');
+        save(); render(); toast('Pharmacie supprimée');
       }
     });
   }
 
   // ── CAISSE CRUD ────────────────────────────────────────────────────────
   function addCaisse(pid) {
-    showModal({
-      title: 'Nouvelle caisse',
-      placeholder: 'Nom (ex : Haj, Fatima…)',
+    showModal({ title: 'Nouvelle caisse', placeholder: 'Nom (ex : Haj, Fatima…)',
       onConfirm: name => {
         const p = state.pharmacies.find(x => x.id === pid);
         if (!p) return;
         p.caisses.push({ id: uid(), name });
-        save(); render();
-        toast('✓ Caisse ajoutée');
+        save(); render(); toast('✓ Caisse ajoutée');
       }
     });
   }
@@ -843,10 +796,7 @@ const App = (() => {
     const p = state.pharmacies.find(x => x.id === pid);
     const c = p?.caisses.find(x => x.id === cid);
     if (!c) return;
-    showModal({
-      title: 'Renommer la caisse',
-      placeholder: 'Nouveau nom',
-      value: c.name,
+    showModal({ title: 'Renommer la caisse', placeholder: 'Nouveau nom', value: c.name,
       onConfirm: name => { c.name = name; save(); render(); }
     });
   }
@@ -855,15 +805,12 @@ const App = (() => {
     const p = state.pharmacies.find(x => x.id === pid);
     const c = p?.caisses.find(x => x.id === cid);
     if (!c) return;
-    if (p.caisses.length <= 1) { toast('⚠️ Au moins une caisse est requise'); return; }
-    showConfirm({
-      title: 'Supprimer la caisse ?',
-      message: `"${c.name}" et toutes ses données seront supprimées.`,
+    if (p.caisses.length <= 1) { toast('⚠️ Au moins une caisse requise'); return; }
+    showConfirm({ title: 'Supprimer la caisse ?', message: `"${c.name}" et ses données seront supprimées.`,
       onConfirm: () => {
         p.caisses = p.caisses.filter(x => x.id !== cid);
         Object.values(state.entries).forEach(day => delete day[cid]);
-        save(); render();
-        toast('Caisse supprimée');
+        save(); render(); toast('Caisse supprimée');
       }
     });
   }
@@ -875,8 +822,8 @@ const App = (() => {
       { type: 'application/json' }
     );
     const a = document.createElement('a');
-    a.href  = URL.createObjectURL(blob);
-    a.download = `caissepharma_${todayStr()}.json`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `pharmacaisse_${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     toast('✓ Export téléchargé');
@@ -886,8 +833,7 @@ const App = (() => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.json';
     inp.onchange = e => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const file = e.target.files[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
         try {
@@ -896,8 +842,7 @@ const App = (() => {
           state.pharmacies = d.pharmacies;
           state.entries    = d.entries || {};
           state.pharmacyId = state.pharmacies[0]?.id ?? null;
-          save(); render();
-          toast('✓ Import réussi');
+          save(); render(); toast('✓ Import réussi');
         } catch { toast('⚠️ Fichier invalide'); }
       };
       reader.readAsText(file);
@@ -909,17 +854,16 @@ const App = (() => {
   async function init() {
     initFirebase();
 
-    // Écran de démarrage
     document.getElementById('app').innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:100dvh;flex-direction:column;gap:14px">
-        <div style="width:64px;height:64px;background:#1e40af;border-radius:16px;display:flex;align-items:center;justify-content:center">
-          <svg width="36" height="36" viewBox="0 0 20 20" fill="none">
+      <div style="display:flex;align-items:center;justify-content:center;height:100dvh;flex-direction:column;gap:16px">
+        <div style="width:72px;height:72px;background:#007AFF;border-radius:18px;display:flex;align-items:center;justify-content:center">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none">
             <rect x="8" y="2" width="4" height="16" rx="1.5" fill="white"/>
             <rect x="2" y="8" width="16" height="4" rx="1.5" fill="white"/>
           </svg>
         </div>
-        <div style="font-size:17px;font-weight:700;color:#1e293b">CaissePharma</div>
-        <div style="font-size:13px;color:#94a3b8">${db ? 'Synchronisation…' : 'Chargement…'}</div>
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.3px;color:#000">PharmaCaisse</div>
+        <div style="font-size:14px;color:#8E8E93">${db ? 'Synchronisation…' : 'Chargement…'}</div>
       </div>`;
 
     await load();
@@ -928,10 +872,9 @@ const App = (() => {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  // ── PUBLIC API ─────────────────────────────────────────────────────────
   return {
-    setView, back,
-    selectPharmacy, changeDate,
+    setView, back, prevDay, nextDay,
+    selectPharmacy,
     onInput, saveCard, saveAll,
     showDetail,
     addPharmacy, renamePharmacy, deletePharmacy,
