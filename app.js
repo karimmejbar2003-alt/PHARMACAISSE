@@ -326,6 +326,9 @@ const App = (() => {
         <button class="btn btn-secondary btn-sm" onclick="App.saveAll('${pharmacy.id}')">
           Tout sauvegarder
         </button>
+        <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('day')">
+          📄 PDF
+        </button>
       </div>
 
       <div class="caisse-grid">${cards}</div>`;
@@ -678,6 +681,8 @@ const App = (() => {
         </div>
         <button class="date-arrow ${!canNext ? 'off' : ''}" onclick="App.nextMonth()">›</button>
       </div>
+
+      ${t.dayCount > 0 ? `<div class="top-actions"><button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">📄 PDF du mois</button></div>` : ''}
 
       ${t.dayCount === 0
         ? empty('📊', 'Aucune donnée', 'Aucune saisie pour ce mois.')
@@ -1040,6 +1045,163 @@ const App = (() => {
     inp.click();
   }
 
+  // ── PDF EXPORT ───────────────────────────────────────────────────────────
+  const PDF_CSS = `
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,Arial,sans-serif;font-size:12px;color:#111;padding:28px 32px}
+    .hd{border-bottom:2px solid #0071E3;padding-bottom:12px;margin-bottom:20px}
+    .hd h1{font-size:19px;color:#0071E3;margin-bottom:3px}
+    .hd h2{font-size:13px;color:#555;font-weight:400}
+    .hd .meta{font-size:11px;color:#888;margin-top:6px}
+    h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#444;margin:18px 0 6px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#f0f4ff;color:#0071E3;text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #cde}
+    td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+    .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .ok{color:#1a9e30;font-weight:600}
+    .bad{color:#d93025;font-weight:600}
+    .bold{font-weight:700}
+    .total td{font-weight:700;border-top:2px solid #ccc;border-bottom:none;padding-top:9px}
+    .sub{font-size:10px;color:#777;margin-top:2px}
+    @page{margin:1.5cm}
+    @media print{body{padding:0}}
+  `;
+
+  function exportPDF(type) {
+    const pharmacy = S.pharmacies.find(p => p.id === S.pharmacyId);
+    if (!pharmacy) return toast('⚠ Aucune pharmacie sélectionnée');
+    const html = type === 'day' ? buildDayPDF(pharmacy) : buildMonthPDF(pharmacy);
+    const win  = window.open('', '_blank');
+    if (!win) return toast('⚠ Autorisez les popups puis réessayez');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  }
+
+  function buildDayPDF(pharmacy) {
+    const day = dayData(pharmacy.id, S.date);
+    let tSobrus=0, tEspece=0, tTPE=0, tCheque=0, tFourni=0, tDep=0, tRemise=0, ecartSum=0, ecartCnt=0;
+
+    const rows = pharmacy.caisses.map(c => {
+      const entry = day[c.id]; if (!entry) return '';
+      const r = calc(entry); if (!r.hasData) return '';
+      tSobrus += r.sobrus; tEspece += r.espece; tTPE += r.tpe;
+      tCheque += r.cheque; tFourni += r.fourni; tDep += r.depenses; tRemise += r.remise;
+      const validated = !!entry.validated;
+      const isOk = r.isValid || validated;
+      if (!isOk && r.sobrusOk) { ecartCnt++; ecartSum += r.diff; }
+      const statusCls = isOk ? 'ok' : 'bad';
+      const statusTxt = r.isValid ? '✓ Équilibré' : validated ? '✓ Validé' : `⚠ Écart ${fmtD(r.diff)}`;
+      const fourniList = r.fournisseurs.filter(f => f.nom || num(f.montant)>0)
+        .map(f => `${f.nom ? esc(f.nom)+' ' : ''}${fmt(f.montant)}`).join(', ') || fmt(0);
+      return `<tr>
+        <td class="bold">${esc(c.name)}</td>
+        <td class="num">${fmt(r.sobrus)}</td>
+        <td class="num">${fmt(r.espece)}</td>
+        <td class="num">${fmt(r.tpe)}</td>
+        <td class="num">${fmt(r.cheque)}</td>
+        <td class="num">${fourniList}</td>
+        <td class="num">${fmt(r.depenses)}</td>
+        <td class="num">${fmt(r.remise)}</td>
+        <td><span class="${statusCls}">${statusTxt}</span>${entry.remarque ? `<div class="sub">${esc(entry.remarque)}</div>` : ''}</td>
+      </tr>`;
+    }).filter(Boolean).join('');
+
+    const tDetail = tEspece+tTPE+tCheque+tFourni+tDep+tRemise;
+    const globalOk = ecartCnt === 0;
+
+    return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+      <title>${esc(pharmacy.name)} — ${fmtDate(S.date)}</title>
+      <style>${PDF_CSS}</style></head><body>
+      <div class="hd">
+        <h1>💊 ${esc(pharmacy.name)}</h1>
+        <h2>Récapitulatif journalier</h2>
+        <div class="meta">${fmtDateLong(S.date)} · Généré le ${fmtDate(today())}</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Caisse</th><th>Sobrus</th><th>Espèce</th><th>TPE</th>
+          <th>Chèque</th><th>Fournisseur</th><th>Dépenses</th><th>Remise</th><th>Statut</th>
+        </tr></thead>
+        <tbody>
+          ${rows || '<tr><td colspan="9" style="text-align:center;color:#999;padding:20px">Aucune saisie</td></tr>'}
+          <tr class="total">
+            <td>TOTAL</td>
+            <td class="num">${fmt(tSobrus)}</td><td class="num">${fmt(tEspece)}</td>
+            <td class="num">${fmt(tTPE)}</td><td class="num">${fmt(tCheque)}</td>
+            <td class="num">${fmt(tFourni)}</td><td class="num">${fmt(tDep)}</td>
+            <td class="num">${fmt(tRemise)}</td>
+            <td><span class="${globalOk?'ok':'bad'}">${globalOk?'✓ Tout équilibré':'⚠ '+ecartCnt+' écart'+(ecartCnt>1?'s':'')+' · '+fmtD(ecartSum)}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})<\/script>
+    </body></html>`;
+  }
+
+  function buildMonthPDF(pharmacy) {
+    const t = calcMonthTotals(pharmacy);
+    const prefix = `${pharmacy.id}|${S.month}`;
+    const days = Object.keys(S.entries)
+      .filter(k => k.startsWith(prefix) && Object.keys(S.entries[k]).length > 0)
+      .map(k => k.slice(pharmacy.id.length + 1)).sort();
+
+    const dayRows = days.map(date => {
+      const day = dayData(pharmacy.id, date);
+      let dSobrus=0, dDetail=0, dEcart=0;
+      let bad=0, okCnt=0;
+      pharmacy.caisses.forEach(c => {
+        const entry = day[c.id]; if (!entry) return;
+        const r = calc(entry); if (!r.hasData) return;
+        dSobrus += r.sobrus; dDetail += r.total;
+        if (r.isValid || entry.validated) okCnt++;
+        else if (r.sobrusOk) { bad++; dEcart += r.diff; }
+      });
+      const allOk = bad === 0 && okCnt > 0;
+      return `<tr>
+        <td>${fmtDate(date)}</td>
+        <td class="num">${fmt(dSobrus)}</td>
+        <td class="num">${fmt(dDetail)}</td>
+        <td><span class="${allOk?'ok':bad>0?'bad':''}">${allOk?'✓ Équilibré':bad>0?'⚠ '+bad+' écart'+(bad>1?'s':'')+' '+fmtD(dEcart):'En cours'}</span></td>
+      </tr>`;
+    }).join('');
+
+    const tDetail = t.espece+t.tpe+t.cheque+t.fourni+t.depenses+t.remise;
+
+    return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+      <title>${esc(pharmacy.name)} — ${fmtMonth(S.month)}</title>
+      <style>${PDF_CSS}</style></head><body>
+      <div class="hd">
+        <h1>💊 ${esc(pharmacy.name)}</h1>
+        <h2>Résumé mensuel — ${fmtMonth(S.month)}</h2>
+        <div class="meta">${t.dayCount} jour${t.dayCount!==1?'s':''} saisi${t.dayCount!==1?'s':''} · Généré le ${fmtDate(today())}</div>
+      </div>
+      <h3>Totaux du mois</h3>
+      <table>
+        <thead><tr><th>Poste</th><th class="num">Montant</th></tr></thead>
+        <tbody>
+          <tr><td class="bold">Total Sobrus</td><td class="num bold">${fmt(t.sobrus)}</td></tr>
+          <tr><td>💵 Espèce</td><td class="num">${fmt(t.espece)}</td></tr>
+          <tr><td>💳 TPE</td><td class="num">${fmt(t.tpe)}</td></tr>
+          <tr><td>🏦 Chèque</td><td class="num">${fmt(t.cheque)}</td></tr>
+          ${t.fourni>0?`<tr><td>🏭 Fournisseurs</td><td class="num">${fmt(t.fourni)}</td></tr>`:''}
+          ${t.depenses>0?`<tr><td>💸 Dépenses</td><td class="num">${fmt(t.depenses)}</td></tr>`:''}
+          ${t.remise>0?`<tr><td>🏷 Remises</td><td class="num">${fmt(t.remise)}</td></tr>`:''}
+          <tr class="total"><td>Total Détail</td><td class="num">${fmt(tDetail)}</td></tr>
+          <tr><td><span class="${t.ecartCount>0?'bad':'ok'}">${t.ecartCount>0?'⚠ Écarts ('+t.ecartCount+' caisse'+(t.ecartCount>1?'s':'')+')':'✓ Aucun écart'}</span></td>
+            <td class="num ${t.ecartCount>0?'bad':'ok'}">${t.ecartCount>0?fmtD(t.ecartSum):''}</td></tr>
+        </tbody>
+      </table>
+      <h3>Journées (${days.length})</h3>
+      <table>
+        <thead><tr><th>Date</th><th class="num">Total Sobrus</th><th class="num">Total Détail</th><th>Statut</th></tr></thead>
+        <tbody>${dayRows||'<tr><td colspan="4" style="text-align:center;color:#999;padding:20px">Aucune journée</td></tr>'}</tbody>
+      </table>
+      <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})<\/script>
+    </body></html>`;
+  }
+
   // ── FOURNISSEURS MULTI ───────────────────────────────────────────────────
   function _ensureEntry(pid, cid) {
     const k = eKey(pid, S.date);
@@ -1141,6 +1303,6 @@ const App = (() => {
     addCaisse, renameCaisse, deleteCaisse,
     exportData, importData, closeModal, toggleTheme, copyEmpLink,
     addFourni, removeFourni, onFourni,
-    prevMonth, nextMonth, validateCard,
+    prevMonth, nextMonth, validateCard, exportPDF,
   };
 })();

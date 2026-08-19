@@ -1,4 +1,4 @@
-const CACHE = 'caissepharma-v7';
+const CACHE = 'caissepharma-v8';
 const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'firebase-config.js'];
 
 self.addEventListener('install', e =>
