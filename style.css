@@ -963,13 +963,22 @@ html, body {
 .month-val { font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
 .month-primary { font-size: 16px; font-weight: 700; color: var(--t1); }
 
-/* ── VALIDATE BUTTON ───────────────────────────────────────────── */
-.btn-validate {
-  background: rgba(40, 205, 65, 0.12);
-  color: var(--ok);
-  border: 0.5px solid rgba(40, 205, 65, 0.30);
+/* ── VU BUTTON ─────────────────────────────────────────────────── */
+.btn-vu {
+  background: rgba(110, 110, 115, 0.10);
+  color: var(--t2);
+  border: 0.5px solid var(--border);
 }
-.btn-validate:hover { background: rgba(40, 205, 65, 0.20); }
+.btn-vu:hover { background: rgba(110, 110, 115, 0.18); }
+
+.vu-badge {
+  font-size: 12px; color: var(--t2);
+  background: var(--bg-inset);
+  border: 0.5px solid var(--border);
+  border-radius: 100px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
 
 /* ── DAY TOTAL CARD ───────────────────────────────────────────── */
 .day-total {

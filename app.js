@@ -109,6 +109,22 @@ const App = (() => {
       .catch(e => console.warn('FS save:', e.message));
   }
 
+  function migrate() {
+    let changed = false;
+    // Rename first pharmacy to AGDAL if only one exists and not yet named
+    if (S.pharmacies.length === 1 && !/AGDAL/i.test(S.pharmacies[0].name)) {
+      S.pharmacies[0].name = 'Pharmacie AGDAL'; changed = true;
+    }
+    // Add LES AMICALES if absent
+    if (!S.pharmacies.some(p => /AMICALES/i.test(p.name))) {
+      S.pharmacies.push({ id: uid(), name: 'Pharmacie LES AMICALES', caisses: [
+        { id: uid(), name: 'Zineb' }, { id: uid(), name: 'Khadija' },
+        { id: uid(), name: 'Youssra' }, { id: uid(), name: 'Lehcen' }, { id: uid(), name: 'Yamina' }
+      ]}); changed = true;
+    }
+    if (changed) save();
+  }
+
   async function load() {
     loadLocal(); defaults();
     if (db) {
@@ -353,12 +369,11 @@ const App = (() => {
     const c = calc(entry);
     const pid = pharmacy.id, cid = caisse.id;
 
-    const validated = !!entry.validated;
-    const isOk      = c.isValid || validated;
-    const cardCls   = c.hasData ? (isOk ? 'ok' : 'bad') : '';
-    const pillCls   = c.hasData ? (isOk ? 'pill-ok' : 'pill-bad') : 'pill-idle';
-    const pillTxt   = c.hasData ? (c.isValid ? '✓ Équilibré' : validated ? '✓ Validé' : '✗ Écart') : 'En attente';
-    const showDiff  = !isOk && c.hasData && c.sobrusOk;
+    const vu       = !!entry.validated;
+    const cardCls  = c.hasData ? (c.isValid ? 'ok' : 'bad') : '';
+    const pillCls  = c.hasData ? (c.isValid ? 'pill-ok' : 'pill-bad') : 'pill-idle';
+    const pillTxt  = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente';
+    const showDiff = !c.isValid && c.hasData && c.sobrusOk;
     const delay     = idx * 0.07;
 
     return `
@@ -483,8 +498,10 @@ const App = (() => {
           ${entry.savedAt ? `✓ Sauvegardé à ${fmtTime(entry.savedAt)}` : ''}
         </span>
         <div style="display:flex;gap:8px;align-items:center">
-          ${!c.isValid && c.hasData && c.sobrusOk && !validated
-            ? `<button class="btn btn-validate btn-sm" onclick="App.validateCard('${pid}','${cid}')">Valider</button>`
+          ${!c.isValid && c.hasData && c.sobrusOk
+            ? vu
+              ? `<span class="vu-badge">👁 Vu</span>`
+              : `<button class="btn btn-vu btn-sm" onclick="App.validateCard('${pid}','${cid}')">👁 Marquer vu</button>`
             : ''}
           <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
             Sauvegarder
@@ -632,7 +649,7 @@ const App = (() => {
           sobrus   += r.sobrus;   espece += r.espece; tpe     += r.tpe;
           cheque   += r.cheque;   fourni += r.fourni; depenses+= r.depenses;
           remise   += r.remise;
-          if (r.isValid || entry.validated) okCount++;
+          if (r.isValid) okCount++;
           else if (r.sobrusOk) { ecartCount++; ecartSum += r.diff; }
         });
       });
@@ -656,8 +673,8 @@ const App = (() => {
       const day  = dayData(pharmacy.id, date);
       const vals = Object.values(day);
       const cnt  = vals.length;
-      const bad  = vals.filter(e => { const r = calc(e); return r.hasData && !r.isValid && !e.validated; }).length;
-      const allOk = cnt > 0 && vals.every(e => { const r = calc(e); return r.isValid || e.validated; });
+      const bad  = vals.filter(e => { const r = calc(e); return r.hasData && !r.isValid; }).length;
+      const allOk = cnt > 0 && vals.every(e => calc(e).isValid);
       const dot  = allOk ? 'sd-ok' : bad > 0 ? 'sd-bad' : 'sd-warn';
       const lbl  = allOk ? 'Tout équilibré' : bad > 0 ? `${bad} écart${bad>1?'s':''}` : 'En cours';
       return `
@@ -1088,11 +1105,10 @@ const App = (() => {
       const r = calc(entry); if (!r.hasData) return '';
       tSobrus += r.sobrus; tEspece += r.espece; tTPE += r.tpe;
       tCheque += r.cheque; tFourni += r.fourni; tDep += r.depenses; tRemise += r.remise;
-      const validated = !!entry.validated;
-      const isOk = r.isValid || validated;
-      if (!isOk && r.sobrusOk) { ecartCnt++; ecartSum += r.diff; }
-      const statusCls = isOk ? 'ok' : 'bad';
-      const statusTxt = r.isValid ? '✓ Équilibré' : validated ? '✓ Validé' : `⚠ Écart ${fmtD(r.diff)}`;
+      if (!r.isValid && r.sobrusOk) { ecartCnt++; ecartSum += r.diff; }
+      const statusCls = r.isValid ? 'ok' : 'bad';
+      const vuTxt     = entry.validated && !r.isValid ? ' <span style="color:#888">(vu)</span>' : '';
+      const statusTxt = r.isValid ? '✓ Équilibré' : `⚠ Écart ${fmtD(r.diff)}`;
       const fourniList = r.fournisseurs.filter(f => f.nom || num(f.montant)>0)
         .map(f => `${f.nom ? esc(f.nom)+' ' : ''}${fmt(f.montant)}`).join(', ') || fmt(0);
       return `<tr>
@@ -1104,7 +1120,7 @@ const App = (() => {
         <td class="num">${fourniList}</td>
         <td class="num">${fmt(r.depenses)}</td>
         <td class="num">${fmt(r.remise)}</td>
-        <td><span class="${statusCls}">${statusTxt}</span>${entry.remarque ? `<div class="sub">${esc(entry.remarque)}</div>` : ''}</td>
+        <td><span class="${statusCls}">${statusTxt}</span>${vuTxt}${entry.remarque ? `<div class="sub">${esc(entry.remarque)}</div>` : ''}</td>
       </tr>`;
     }).filter(Boolean).join('');
 
@@ -1155,7 +1171,7 @@ const App = (() => {
         const entry = day[c.id]; if (!entry) return;
         const r = calc(entry); if (!r.hasData) return;
         dSobrus += r.sobrus; dDetail += r.total;
-        if (r.isValid || entry.validated) okCnt++;
+        if (r.isValid) okCnt++;
         else if (r.sobrusOk) { bad++; dEcart += r.diff; }
       });
       const allOk = bad === 0 && okCnt > 0;
@@ -1291,6 +1307,7 @@ const App = (() => {
       </div>`;
 
     await load();
+    migrate();
     render();
   }
 
