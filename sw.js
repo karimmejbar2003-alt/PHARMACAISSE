@@ -1,4 +1,4 @@
-const CACHE = 'caissepharma-v13';
+const CACHE = 'caissepharma-v14';
 const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json',
                 'icon-180.png', 'icon-192.png', 'icon-512.png', 'firebase-config.js'];
 
@@ -15,6 +15,27 @@ self.addEventListener('activate', e =>
       .then(() => self.clients.claim())
   )
 );
+
+self.addEventListener('push', e => {
+  if (!e.data) return;
+  const { title, body, icon } = e.data.json();
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: 'pharma-emp-submit',
+      renotify: true,
+      data: { url: self.location.origin + self.location.pathname.replace('sw.js','') }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow(e.notification.data?.url || '/'));
+});
 
 // Network-first : toujours récupérer la dernière version, cache en fallback offline
 self.addEventListener('fetch', e => {

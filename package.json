@@ -1,0 +1,9 @@
+{
+  "name": "pharma-caisse",
+  "version": "1.0.0",
+  "description": "Réconciliation journalière des caisses de pharmacie",
+  "license": "ISC",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

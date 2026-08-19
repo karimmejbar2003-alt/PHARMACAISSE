@@ -24,6 +24,72 @@ const App = (() => {
 
   const FOURNISSEURS = ['EXPERT', 'PARA2000', '2A PARA'];
 
+  // ── PUSH NOTIFICATIONS ───────────────────────────────────────────────────
+  const VAPID_PUBLIC_KEY = 'BOcHvHhgz2K8SRE7R5e0sk5jLM2GEi-0cV8bdWjx7tkIc_qM5_oehXl9gjK2_JE2k_2rZbEwSsWQAxqGuR6oRBU';
+
+  function urlBase64ToUint8Array(base64String) {
+    const pad = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  async function subscribeToPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return toast('⚠ Notifications non supportées sur ce navigateur');
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return toast('⚠ Permission de notification refusée');
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      if (db) {
+        await db.doc(FS_DOC).update({
+          pushSubscriptions: firebase.firestore.FieldValue.arrayUnion(JSON.parse(JSON.stringify(sub)))
+        }).catch(() =>
+          db.doc(FS_DOC).set({ pushSubscriptions: [JSON.parse(JSON.stringify(sub))] }, { merge: true })
+        );
+      }
+      localStorage.setItem('push_subscribed', '1');
+      toast('✓ Notifications activées !');
+      render();
+    } catch (err) {
+      console.warn('Push subscribe error:', err);
+      toast('⚠ Erreur lors de l\'activation');
+    }
+  }
+
+  function isPushSubscribed() {
+    return localStorage.getItem('push_subscribed') === '1'
+      && Notification.permission === 'granted';
+  }
+
+  async function sendOwnerNotification(pharmacyName, caisseName, empName) {
+    if (!db) return;
+    try {
+      const snap = await db.doc(FS_DOC).get();
+      const subs = snap.data()?.pushSubscriptions || [];
+      const payload = {
+        title: '💊 PharmaCaisse',
+        body: `${empName} a envoyé ses chiffres — ${caisseName} (${pharmacyName})`,
+        icon: '/icon-192.png'
+      };
+      await Promise.all(subs.map(sub =>
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: sub, payload })
+        }).catch(() => {})
+      ));
+    } catch (err) {
+      console.warn('Push send error:', err);
+    }
+  }
+
   // ── EMPLOYEE SESSION ─────────────────────────────────────────────────────
   const IS_LOGIN_MODE = new URLSearchParams(window.location.search).has('login');
   const EMP_KEY = 'pharma_emp_session';
@@ -413,6 +479,14 @@ const App = (() => {
     S.entries[k][cid].lockedByEmp  = true;
     save();
     toast('✓ Données envoyées au patron !');
+
+    const session  = getEmpSession();
+    const pharmacy = S.pharmacies.find(p => p.id === pid);
+    const caisse   = pharmacy?.caisses.find(c => c.id === cid);
+    if (session && pharmacy && caisse) {
+      sendOwnerNotification(pharmacy.name, caisse.name, session.name);
+    }
+
     renderEmpDashboard();
   }
 
@@ -1087,6 +1161,19 @@ const App = (() => {
         </div>
       </div>
 
+      <div class="sec-caption">Notifications</div>
+      <div class="set-group">
+        <div class="set-row">
+          <div>
+            <div class="set-row-label">🔔 Notifications push</div>
+            <div class="set-row-sub">${isPushSubscribed() ? 'Activées — vous serez notifié à chaque envoi employé' : 'Recevez une alerte quand un employé envoie ses chiffres'}</div>
+          </div>
+          ${isPushSubscribed()
+            ? `<span class="pill pill-ok" style="flex-shrink:0"><div class="pill-dot"></div>Activées</span>`
+            : `<button class="btn btn-primary btn-sm" onclick="App.subscribeToPush()">Activer</button>`}
+        </div>
+      </div>
+
       <div style="text-align:center;color:var(--t2);font-size:13px;padding:16px 0 28px;letter-spacing:-0.1px">
         PharmaCaisse · Synchronisé avec Firebase
       </div>`;
@@ -1708,6 +1795,7 @@ const App = (() => {
     exportData, importData, closeModal, toggleTheme,
     addFourni, removeFourni, onFourni,
     prevMonth, nextMonth, validateCard, exportPDF,
+    subscribeToPush,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
     empLogout, submitEmpCard, copyLoginLink,
     addEmployee, editEmployee, saveEmployee, deleteEmployee,
