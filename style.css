@@ -65,37 +65,39 @@
   --gutter: 18px;
 }
 
-/* ── DARK MODE ────────────────────────────────────────────────── */
+/* ── DARK VARS (shared) ───────────────────────────────────────── */
+/* Applied via system preference OR manual toggle */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg:           #000000;
     --bg-elevated:  #1C1C1E;
     --bg-glass:     rgba(28, 28, 30, 0.80);
     --bg-glass-hvy: rgba(28, 28, 30, 0.96);
     --bg-inset:     rgba(255, 255, 255, 0.04);
-
-    --t1:  #F5F5F7;
-    --t2:  #98989D;
-    --t3:  rgba(255, 255, 255, 0.22);
-
-    --accent:       #2997FF;
-    --accent-light: rgba(41, 151, 255, 0.10);
-    --accent-mid:   rgba(41, 151, 255, 0.20);
-
-    --ok:     #30D158;
-    --ok-bg:  rgba(48, 209, 88, 0.12);
-    --bad:    #FF453A;
-    --bad-bg: rgba(255, 69, 58, 0.12);
-
-    --border:     rgba(255, 255, 255, 0.08);
-    --sep:        rgba(255, 255, 255, 0.06);
-    --glass-edge: rgba(255, 255, 255, 0.10);
-
-    --sh-xs: 0 1px 4px rgba(0,0,0,0.40);
-    --sh-sm: 0 2px 12px rgba(0,0,0,0.50);
-    --sh-md: 0 8px 32px rgba(0,0,0,0.60);
-    --sh-lg: 0 20px 60px rgba(0,0,0,0.70);
+    --t1:  #F5F5F7; --t2: #98989D; --t3: rgba(255,255,255,0.22);
+    --accent: #2997FF; --accent-light: rgba(41,151,255,0.10); --accent-mid: rgba(41,151,255,0.20);
+    --ok: #30D158; --ok-bg: rgba(48,209,88,0.12);
+    --bad: #FF453A; --bad-bg: rgba(255,69,58,0.12);
+    --border: rgba(255,255,255,0.08); --sep: rgba(255,255,255,0.06); --glass-edge: rgba(255,255,255,0.10);
+    --sh-xs: 0 1px 4px rgba(0,0,0,0.40); --sh-sm: 0 2px 12px rgba(0,0,0,0.50);
+    --sh-md: 0 8px 32px rgba(0,0,0,0.60); --sh-lg: 0 20px 60px rgba(0,0,0,0.70);
   }
+}
+
+/* Manual dark mode */
+[data-theme="dark"] {
+  --bg:           #000000;
+  --bg-elevated:  #1C1C1E;
+  --bg-glass:     rgba(28, 28, 30, 0.80);
+  --bg-glass-hvy: rgba(28, 28, 30, 0.96);
+  --bg-inset:     rgba(255, 255, 255, 0.04);
+  --t1:  #F5F5F7; --t2: #98989D; --t3: rgba(255,255,255,0.22);
+  --accent: #2997FF; --accent-light: rgba(41,151,255,0.10); --accent-mid: rgba(41,151,255,0.20);
+  --ok: #30D158; --ok-bg: rgba(48,209,88,0.12);
+  --bad: #FF453A; --bad-bg: rgba(255,69,58,0.12);
+  --border: rgba(255,255,255,0.08); --sep: rgba(255,255,255,0.06); --glass-edge: rgba(255,255,255,0.10);
+  --sh-xs: 0 1px 4px rgba(0,0,0,0.40); --sh-sm: 0 2px 12px rgba(0,0,0,0.50);
+  --sh-md: 0 8px 32px rgba(0,0,0,0.60); --sh-lg: 0 20px 60px rgba(0,0,0,0.70);
 }
 
 /* ── RESET & BASE ─────────────────────────────────────────────── */
@@ -876,6 +878,65 @@ html, body {
 }
 
 .splash-sub { font-size: 14px; color: var(--t2); }
+
+/* ── THEME TOGGLE BUTTON ──────────────────────────────────────── */
+.theme-btn {
+  width: 34px; height: 34px;
+  border: none; border-radius: 50%;
+  background: var(--bg-inset);
+  color: var(--t2); font-size: 16px;
+  cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: background 0.2s, transform 0.2s var(--spring);
+  flex-shrink: 0;
+}
+.theme-btn:active { transform: scale(0.88); }
+.theme-btn:hover  { background: var(--border); }
+
+/* ── DESKTOP LAYOUT ───────────────────────────────────────────── */
+@media (min-width: 860px) {
+  #app { max-width: 1100px; }
+
+  .navbar-inner { padding: 0 32px; }
+
+  .content { padding-left: 0; padding-right: 0; }
+
+  .segment-wrap  { padding: 20px 32px 10px; }
+  .date-nav      { padding: 12px 24px 6px; }
+  .top-actions   { padding: 6px 32px 12px; }
+  .caisse-grid   { padding: 4px 32px 8px; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .sec-caption   { padding: 18px 32px 8px; }
+  .list-card     { margin: 0 32px 16px; }
+  .det-card      { margin: 0 32px 16px; }
+  .set-group     { margin: 0 32px 16px; }
+
+  /* Desktop: hide mobile tab bar, show top nav instead */
+  .tabbar { display: none; }
+  .content { padding-bottom: 40px; }
+
+  /* Desktop top nav labels */
+  .desk-nav {
+    display: flex; gap: 4px; align-items: center;
+  }
+
+  .desk-nav-btn {
+    background: none; border: none;
+    color: var(--t2); font-size: 14px; font-weight: 500;
+    cursor: pointer; padding: 6px 12px;
+    border-radius: var(--r-xs);
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  .desk-nav-btn:hover  { background: var(--bg-inset); }
+  .desk-nav-btn.active { color: var(--accent); background: var(--accent-light); }
+}
+
+/* Keep tab bar on mobile/tablet */
+@media (max-width: 859px) {
+  .desk-nav { display: none; }
+}
 
 /* ── UTILS ────────────────────────────────────────────────────── */
 input[type="number"] { -moz-appearance: textfield; }

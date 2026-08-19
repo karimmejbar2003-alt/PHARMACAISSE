@@ -166,9 +166,18 @@ const App = (() => {
             ? `<button class="navbar-back" onclick="App.back()">‹ Retour</button>`
             : `<div style="width:48px"></div>`}
           <div class="navbar-title">${esc(title)}</div>
-          ${!showBack
-            ? `<button class="navbar-btn" onclick="App.setView('settings')">Réglages</button>`
-            : `<div style="width:72px"></div>`}
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="theme-btn" id="theme-btn" onclick="App.toggleTheme()" title="Changer le thème">
+              ${isDark() ? '☀️' : '🌙'}
+            </button>
+            ${!showBack
+              ? `<div class="desk-nav">
+                  <button class="desk-nav-btn ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">📋 Saisie</button>
+                  <button class="desk-nav-btn ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">📅 Historique</button>
+                  <button class="desk-nav-btn ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">⚙️ Réglages</button>
+                </div>`
+              : ''}
+          </div>
         </div>
       </div>
 
@@ -788,8 +797,30 @@ const App = (() => {
     inp.click();
   }
 
+  // ── THEME ────────────────────────────────────────────────────────────────
+  function initTheme() {
+    const saved = localStorage.getItem('pharma_theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+  }
+
+  function isDark() {
+    const t = document.documentElement.getAttribute('data-theme');
+    if (t === 'dark')  return true;
+    if (t === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function toggleTheme() {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('pharma_theme', next);
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = isDark() ? '☀️' : '🌙';
+  }
+
   // ── INIT ─────────────────────────────────────────────────────────────────
   async function init() {
+    initTheme();
     initFirebase();
 
     document.getElementById('app').innerHTML = `
@@ -815,6 +846,6 @@ const App = (() => {
     onInput, saveCard, saveAll, showDetail,
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
-    exportData, importData, closeModal,
+    exportData, importData, closeModal, toggleTheme,
   };
 })();
