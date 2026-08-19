@@ -23,6 +23,11 @@ const App = (() => {
 
   const FOURNISSEURS = ['EXPERT', 'PARA2000', '2A PARA'];
 
+  // ── EMPLOYEE MODE ────────────────────────────────────────────────────────
+  const _urlParams = new URLSearchParams(window.location.search);
+  const EMP = { pid: _urlParams.get('pid'), cid: _urlParams.get('emp') };
+  const IS_EMP = !!(EMP.pid && EMP.cid);
+
   // ── HELPERS ─────────────────────────────────────────────────────────────
   function today() { return new Date().toISOString().split('T')[0]; }
 
@@ -149,7 +154,34 @@ const App = (() => {
   }
 
   // ── RENDER ──────────────────────────────────────────────────────────────
+  function renderEmpPage() {
+    const pharmacy = S.pharmacies.find(p => p.id === EMP.pid);
+    const caisse   = pharmacy?.caisses.find(c => c.id === EMP.cid);
+    document.body.classList.add('emp-mode');
+
+    let content;
+    if (!pharmacy || !caisse) {
+      content = empty('⚠️', 'Lien invalide', 'Ce lien n\'est plus valide. Demandez-en un nouveau au patron.');
+    } else {
+      content = `
+        <div class="emp-header">
+          <div class="emp-pharma">${esc(pharmacy.name)}</div>
+          <div class="emp-name">💊 ${esc(caisse.name)}</div>
+          <div class="emp-date">${fmtDateLong(S.date)}</div>
+        </div>
+        <div class="emp-grid">
+          ${renderCard(pharmacy, caisse, 0)}
+        </div>
+        <div class="emp-footer">📡 Données transmises au patron en temps réel</div>`;
+    }
+
+    document.getElementById('app').innerHTML = `<div class="content emp-content">${content}</div>`;
+    genIcon();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
   function render() {
+    if (IS_EMP) { renderEmpPage(); return; }
     const pharmacy = S.pharmacies.find(p => p.id === S.pharmacyId);
     const isDetail = S.view === 'histDetail';
 
@@ -551,6 +583,26 @@ const App = (() => {
         </button>
       </div>
 
+      <div class="sec-caption">Accès employés</div>
+      <div class="set-group" style="margin:0 var(--gutter) 6px">
+        <div class="set-row" style="border-bottom:none">
+          <div class="set-row-sub" style="flex:1;line-height:1.55">
+            Envoyez ce lien à chaque employé — il saisit ses données sur son téléphone, elles s'affichent ici instantanément.
+          </div>
+        </div>
+      </div>
+      ${S.pharmacies.map(p => `
+        <div class="set-group">
+          <div class="set-group-hd">
+            <span class="set-group-title">🏥 ${esc(p.name)}</span>
+          </div>
+          ${p.caisses.map(c => `
+            <div class="set-row">
+              <span class="set-row-label">💊 ${esc(c.name)}</span>
+              <button class="btn btn-secondary btn-sm" onclick="App.copyEmpLink('${p.id}','${c.id}')">🔗 Copier le lien</button>
+            </div>`).join('')}
+        </div>`).join('')}
+
       <div class="sec-caption">Données</div>
       <div class="set-group">
         <div class="set-row">
@@ -797,6 +849,26 @@ const App = (() => {
     inp.click();
   }
 
+  // ── EMPLOYEE LINKS ───────────────────────────────────────────────────────
+  function copyEmpLink(pid, cid) {
+    const base = window.location.origin + window.location.pathname;
+    const url  = `${base}?pid=${encodeURIComponent(pid)}&emp=${encodeURIComponent(cid)}`;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => toast('✓ Lien copié')).catch(() => fallbackCopy(url));
+    } else {
+      fallbackCopy(url);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy'); toast('✓ Lien copié'); }
+    catch { toast('⚠ Copiez ce lien manuellement'); }
+    ta.remove();
+  }
+
   // ── THEME ────────────────────────────────────────────────────────────────
   function initTheme() {
     const saved = localStorage.getItem('pharma_theme');
@@ -846,6 +918,6 @@ const App = (() => {
     onInput, saveCard, saveAll, showDetail,
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
-    exportData, importData, closeModal, toggleTheme,
+    exportData, importData, closeModal, toggleTheme, copyEmpLink,
   };
 })();

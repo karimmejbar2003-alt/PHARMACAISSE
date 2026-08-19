@@ -938,6 +938,49 @@ html, body {
   .desk-nav { display: none; }
 }
 
+/* ── EMPLOYEE MODE ────────────────────────────────────────────── */
+.emp-content {
+  padding-bottom: 40px;
+  min-height: 100dvh;
+}
+
+.emp-header {
+  text-align: center;
+  padding: 36px var(--gutter) 20px;
+}
+
+.emp-pharma {
+  font-size: 12px; font-weight: 600;
+  color: var(--t2); text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 6px;
+}
+
+.emp-name {
+  font-size: 26px; font-weight: 700;
+  color: var(--t1); letter-spacing: -0.6px;
+  margin-bottom: 6px;
+}
+
+.emp-date {
+  font-size: 15px; color: var(--t2);
+  text-transform: capitalize; letter-spacing: -0.1px;
+}
+
+.emp-grid {
+  padding: 0 var(--gutter) 8px;
+}
+
+.emp-footer {
+  text-align: center;
+  padding: 16px var(--gutter) 36px;
+  font-size: 13px; color: var(--t2);
+  letter-spacing: -0.1px;
+}
+
+body.emp-mode .toast {
+  bottom: calc(env(safe-area-inset-bottom, 0) + 20px);
+}
+
 /* ── UTILS ────────────────────────────────────────────────────── */
 input[type="number"] { -moz-appearance: textfield; }
 input[type="number"]::-webkit-inner-spin-button,
