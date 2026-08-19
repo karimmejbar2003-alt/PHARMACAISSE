@@ -73,16 +73,28 @@ const App = (() => {
 
   function ensureDefaultPharmacy() {
     if (state.pharmacies.length === 0) {
-      const pid = uid();
-      state.pharmacies = [{
-        id: pid,
-        name: 'Ma Pharmacie',
-        caisses: [
-          { id: uid(), name: 'Haj'   },
-          { id: uid(), name: 'Hasna' },
-          { id: uid(), name: 'Kamal' },
-        ]
-      }];
+      state.pharmacies = [
+        {
+          id: uid(),
+          name: 'Pharmacie AGDAL',
+          caisses: [
+            { id: uid(), name: 'Haj'   },
+            { id: uid(), name: 'Hasna' },
+            { id: uid(), name: 'Kamal' },
+          ]
+        },
+        {
+          id: uid(),
+          name: 'Pharmacie LES AMICALES',
+          caisses: [
+            { id: uid(), name: 'Zineb'   },
+            { id: uid(), name: 'Khadija' },
+            { id: uid(), name: 'Youssra' },
+            { id: uid(), name: 'Lehcen'  },
+            { id: uid(), name: 'Yamina'  },
+          ]
+        }
+      ];
     }
     state.pharmacyId = state.pharmacies[0].id;
   }
