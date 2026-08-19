@@ -197,15 +197,49 @@ const App = (() => {
   function renderLoginPage() {
     document.body.classList.add('emp-mode');
     if (!_ls.pid && S.pharmacies.length) _ls.pid = S.pharmacies[0].id;
-    const pharma   = S.pharmacies.find(p => p.id === _ls.pid);
-    const emps     = pharma?.employees || [];
-    const pinDots  = '●'.repeat(_ls.pin.length) + '○'.repeat(4 - _ls.pin.length);
-    const pharmOpts = S.pharmacies.map(p =>
-      `<option value="${p.id}" ${p.id === _ls.pid ? 'selected':''}>${esc(p.name)}</option>`).join('');
-    const empOpts  = emps.length
-      ? `<option value="">— Choisir —</option>` + emps.map(e =>
-          `<option value="${e.id}" ${e.id === _ls.eid ? 'selected':''}>${esc(e.name)}</option>`).join('')
-      : `<option value="">Aucun employé configuré</option>`;
+    const pharma  = S.pharmacies.find(p => p.id === _ls.pid);
+    const emps    = pharma?.employees || [];
+    const pinDots = '●'.repeat(_ls.pin.length) + '○'.repeat(4 - _ls.pin.length);
+
+    // Pharmacy segment (only if multiple)
+    const pharmSeg = S.pharmacies.length > 1 ? `
+      <div class="login-field">
+        <div class="login-label">Pharmacie</div>
+        <div class="login-pharma-seg">
+          ${S.pharmacies.map(p => `
+            <button class="login-pharma-btn ${p.id === _ls.pid ? 'active' : ''}"
+              onclick="App.lsPharmacy('${p.id}')">
+              ${esc(p.name.replace(/pharmacie\s*/i,'').trim())}
+            </button>`).join('')}
+        </div>
+      </div>` : '';
+
+    // Employee name buttons
+    const empGrid = emps.length ? `
+      <div class="login-field">
+        <div class="login-label">Qui êtes-vous ?</div>
+        <div class="emp-name-grid">
+          ${emps.map(e => `
+            <button class="emp-name-btn ${e.id === _ls.eid ? 'selected' : ''}"
+              onclick="App.lsEmployee('${e.id}')">
+              <span class="emp-name-icon">👤</span>
+              ${esc(e.name)}
+            </button>`).join('')}
+        </div>
+      </div>` : `<div class="login-empty">Aucun employé configuré.<br>Contactez le patron.</div>`;
+
+    // PIN (only if employee selected)
+    const pinSection = _ls.eid ? `
+      <div class="login-field">
+        <div class="login-label">Code PIN</div>
+        <div class="pin-display">${pinDots}</div>
+      </div>
+      <div class="pin-pad">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pin-btn" onclick="App.lsPin('${n}')">${n}</button>`).join('')}
+        <span></span>
+        <button class="pin-btn" onclick="App.lsPin('0')">0</button>
+        <button class="pin-btn pin-del" onclick="App.lsPinDel()">⌫</button>
+      </div>` : '';
 
     document.getElementById('app').innerHTML = `
       <div class="login-wrap">
@@ -213,25 +247,9 @@ const App = (() => {
           <div class="login-logo">💊</div>
           <div class="login-title">PharmaCaisse</div>
           <div class="login-sub">Espace employé</div>
-          ${S.pharmacies.length > 1 ? `
-          <div class="login-field">
-            <label class="login-label">Pharmacie</label>
-            <select class="login-select" onchange="App.lsPharmacy(this.value)">${pharmOpts}</select>
-          </div>` : ''}
-          <div class="login-field">
-            <label class="login-label">Nom</label>
-            <select class="login-select" onchange="App.lsEmployee(this.value)">${empOpts}</select>
-          </div>
-          <div class="login-field">
-            <label class="login-label">Code PIN</label>
-            <div class="pin-display">${pinDots}</div>
-          </div>
-          <div class="pin-pad">
-            ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pin-btn" onclick="App.lsPin('${n}')">${n}</button>`).join('')}
-            <span></span>
-            <button class="pin-btn" onclick="App.lsPin('0')">0</button>
-            <button class="pin-btn pin-del" onclick="App.lsPinDel()">⌫</button>
-          </div>
+          ${pharmSeg}
+          ${empGrid}
+          ${pinSection}
           ${_ls.err ? `<div class="login-error">${esc(_ls.err)}</div>` : ''}
         </div>
       </div>`;
@@ -297,6 +315,33 @@ const App = (() => {
   function renderEmpCard(pharmacy, caisse) {
     const entry = getEntry(pharmacy.id, S.date, caisse.id);
     const pid = pharmacy.id, cid = caisse.id;
+    const r = calc(entry);
+
+    // ── Verrouillé après envoi ───────────────────────────────────────────
+    if (entry.lockedByEmp) {
+      const fourniLines = r.fournisseurs.filter(f => f.nom || num(f.montant) > 0)
+        .map(f => `<div class="emp-sent-row"><span>🏭 ${f.nom||'Fournisseur'}</span><span>${fmt(f.montant)}</span></div>`).join('');
+      return `
+      <div class="pc ok">
+        <div class="pc-header">
+          <div class="pc-name">💊 ${esc(caisse.name)}</div>
+          <div class="pill pill-ok"><div class="pill-dot"></div>Données envoyées</div>
+        </div>
+        <div class="emp-sent-summary">
+          <div class="emp-sent-row"><span>💵 Espèce</span><span>${fmt(r.espece)}</span></div>
+          <div class="emp-sent-row"><span>💳 TPE</span><span>${fmt(r.tpe)}</span></div>
+          <div class="emp-sent-row"><span>🏦 Chèque</span><span>${fmt(r.cheque)}</span></div>
+          ${fourniLines}
+          <div class="emp-sent-row"><span>💸 Dépenses</span><span>${fmt(r.depenses)}</span></div>
+          <div class="emp-sent-row"><span>🏷 Remise</span><span>${fmt(r.remise)}</span></div>
+          ${entry.remarque ? `<div class="emp-sent-note">📝 ${esc(entry.remarque)}</div>` : ''}
+          <div class="emp-sent-time">✓ Envoyé à ${fmtTime(entry.savedAt)}</div>
+        </div>
+        <div class="emp-locked-msg">Les données ont été transmises au patron.<br>Contactez-le si une correction est nécessaire.</div>
+      </div>`;
+    }
+
+    // ── Formulaire de saisie ─────────────────────────────────────────────
     return `
     <div class="pc" id="card-${cid}">
       <div class="pc-header">
@@ -352,14 +397,23 @@ const App = (() => {
           oninput="App.onInput('${pid}','${cid}','remarque',this.value)">${esc(entry.remarque)}</textarea>
       </div>
       <div class="pc-footer">
-        <span class="save-status" id="ft-${cid}">
-          ${entry.savedAt ? `✓ Envoyé à ${fmtTime(entry.savedAt)}` : ''}
-        </span>
-        <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
+        <span class="save-status" id="ft-${cid}"></span>
+        <button class="btn btn-primary btn-sm" onclick="App.submitEmpCard('${pid}','${cid}')">
           Envoyer ›
         </button>
       </div>
     </div>`;
+  }
+
+  function submitEmpCard(pid, cid) {
+    const k = eKey(pid, S.date);
+    if (!S.entries[k]) S.entries[k] = {};
+    if (!S.entries[k][cid]) S.entries[k][cid] = blank();
+    S.entries[k][cid].savedAt      = new Date().toISOString();
+    S.entries[k][cid].lockedByEmp  = true;
+    save();
+    toast('✓ Données envoyées au patron !');
+    renderEmpDashboard();
   }
 
   function empLogout() {
@@ -1581,7 +1635,7 @@ const App = (() => {
     addFourni, removeFourni, onFourni,
     prevMonth, nextMonth, validateCard, exportPDF,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
-    empLogout, copyLoginLink,
+    empLogout, submitEmpCard, copyLoginLink,
     addEmployee, editEmployee, saveEmployee, deleteEmployee,
   };
 })();

@@ -1115,6 +1115,82 @@ html, body {
   letter-spacing: 0.8px;
 }
 
+.login-empty {
+  font-size: 14px; color: var(--t2);
+  text-align: center; padding: 16px 0;
+  line-height: 1.6;
+}
+
+/* Pharmacy segment on login */
+.login-pharma-seg {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.login-pharma-btn {
+  flex: 1; min-width: 120px;
+  padding: 10px 12px; border: 0.5px solid var(--border);
+  border-radius: var(--r-md); background: var(--bg-inset);
+  font-size: 14px; font-weight: 500; color: var(--t2);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.login-pharma-btn.active {
+  background: var(--accent-light); color: var(--accent);
+  border-color: var(--accent); font-weight: 600;
+}
+
+/* Employee name grid */
+.emp-name-grid {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.emp-name-btn {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-inset);
+  font-size: 16px; font-weight: 500; color: var(--t1);
+  cursor: pointer; font-family: inherit;
+  text-align: left;
+  transition: all 0.15s var(--smooth);
+}
+.emp-name-btn:active { transform: scale(0.98); }
+.emp-name-btn.selected {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+.emp-name-btn.selected::after {
+  content: '✓'; margin-left: auto;
+  font-weight: 700;
+}
+.emp-name-icon { font-size: 20px; }
+
+/* Locked emp card */
+.emp-sent-summary {
+  padding: 4px 0 4px;
+}
+.emp-sent-row {
+  display: flex; justify-content: space-between;
+  padding: 11px 18px;
+  border-bottom: 0.5px solid var(--sep);
+  font-size: 15px; color: var(--t1);
+}
+.emp-sent-row span:last-child { font-weight: 500; font-variant-numeric: tabular-nums; }
+.emp-sent-note {
+  padding: 10px 18px;
+  font-size: 13px; color: var(--t2); font-style: italic;
+  border-bottom: 0.5px solid var(--sep);
+}
+.emp-sent-time {
+  padding: 11px 18px;
+  font-size: 13px; color: var(--ok); font-weight: 600;
+}
+.emp-locked-msg {
+  padding: 12px 18px 16px;
+  font-size: 13px; color: var(--t2);
+  text-align: center; line-height: 1.55;
+  border-top: 0.5px solid var(--sep);
+}
+
 /* ── EMPLOYEE TOPBAR ───────────────────────────────────────────── */
 .emp-topbar {
   display: flex; align-items: center; justify-content: space-between;
