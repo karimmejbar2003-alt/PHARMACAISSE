@@ -1,0 +1,19 @@
+{
+  "name": "CaissePharma",
+  "short_name": "CaissePharma",
+  "description": "Vérification journalière des caisses de pharmacie",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "orientation": "any",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
