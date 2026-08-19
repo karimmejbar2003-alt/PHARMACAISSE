@@ -1,4 +1,4 @@
-const CACHE = 'caissepharma-v6';
+const CACHE = 'caissepharma-v7';
 const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'firebase-config.js'];
 
 self.addEventListener('install', e =>
@@ -15,9 +15,16 @@ self.addEventListener('activate', e =>
   )
 );
 
+// Network-first : toujours récupérer la dernière version, cache en fallback offline
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
