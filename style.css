@@ -1003,18 +1003,31 @@ html, body {
 .day-total-label { color: var(--t2); font-size: 14px; }
 .day-total-val   { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
 
-/* ── MULTI FOURNISSEUR ─────────────────────────────────────────── */
-.fourni-del {
-  background: none; border: none;
-  color: var(--bad); font-size: 15px;
-  cursor: pointer; padding: 4px 6px;
-  border-radius: var(--r-xs);
-  line-height: 1; flex-shrink: 0;
-  transition: background 0.15s;
-}
-.fourni-del:active { background: var(--bad-bg); }
+/* ── FOURNISSEUR CHIPS ─────────────────────────────────────────── */
+.fourni-chip-row { flex-wrap: wrap; align-items: flex-start; gap: 8px; min-height: 52px; }
 
-.fourni-add-row { padding-top: 2px; padding-bottom: 2px; border-bottom: none; }
+.fourni-chips {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  justify-content: flex-end; flex: 1;
+}
+
+.fourni-chip {
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--t2); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s var(--smooth);
+  white-space: nowrap;
+  -webkit-user-select: none;
+}
+.fourni-chip:active { transform: scale(0.94); }
+.fourni-chip.active {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* ── LOGIN PAGE ───────────────────────────────────────────────── */
 .login-wrap {

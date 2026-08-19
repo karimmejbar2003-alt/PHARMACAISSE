@@ -430,23 +430,7 @@ const App = (() => {
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.cheque)}"
           step="0.01" min="0" inputmode="decimal" oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
       </div>
-      ${normFournisseurs(entry).map((f, idx) => `
-      <div class="field-row">
-        <span class="field-label">🏭 ${idx===0?'Fournisseur':''}</span>
-        <div class="fourni-group">
-          <select class="fourni-picker" onchange="App.onFourni('${pid}','${cid}',${idx},'nom',this.value)">
-            <option value="">Aucun</option>
-            ${FOURNISSEURS.map(n=>`<option value="${n}" ${f.nom===n?'selected':''}>${n}</option>`).join('')}
-          </select>
-          <input type="number" class="fourni-amount" placeholder="0,00" value="${esc(f.montant)}"
-            step="0.01" min="0" inputmode="decimal"
-            oninput="App.onFourni('${pid}','${cid}',${idx},'montant',this.value)">
-          ${normFournisseurs(entry).length>1?`<button class="fourni-del" onclick="App.removeFourni('${pid}','${cid}',${idx})">✕</button>`:''}
-        </div>
-      </div>`).join('')}
-      <div class="field-row fourni-add-row">
-        <button class="btn btn-ghost" style="font-size:14px;padding:6px 0" onclick="App.addFourni('${pid}','${cid}')">＋ Fournisseur</button>
-      </div>
+      ${renderFourniChips(pid, cid, entry)}
       <div class="field-row">
         <span class="field-label">💸 Dépenses</span>
         <input type="number" class="field-input" placeholder="0,00" value="${esc(entry.depenses)}"
@@ -710,24 +694,7 @@ const App = (() => {
           oninput="App.onInput('${pid}','${cid}','cheque',this.value)">
       </div>
 
-      ${normFournisseurs(entry).map((f, idx) => `
-      <div class="field-row">
-        <span class="field-label">🏭 ${idx === 0 ? 'Fournisseur' : ''}</span>
-        <div class="fourni-group">
-          <select class="fourni-picker" onchange="App.onFourni('${pid}','${cid}',${idx},'nom',this.value)">
-            <option value="">Aucun</option>
-            ${FOURNISSEURS.map(n => `<option value="${n}" ${f.nom === n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-          <input type="number" class="fourni-amount" placeholder="0,00"
-            value="${esc(f.montant)}"
-            step="0.01" min="0" inputmode="decimal"
-            oninput="App.onFourni('${pid}','${cid}',${idx},'montant',this.value)">
-          ${normFournisseurs(entry).length > 1 ? `<button class="fourni-del" onclick="App.removeFourni('${pid}','${cid}',${idx})">✕</button>` : ''}
-        </div>
-      </div>`).join('')}
-      <div class="field-row fourni-add-row">
-        <button class="btn btn-ghost" style="font-size:14px;padding:6px 0" onclick="App.addFourni('${pid}','${cid}')">＋ Fournisseur</button>
-      </div>
+      ${renderFourniChips(pid, cid, entry)}
 
       <div class="field-row">
         <span class="field-label">💸 Dépenses</span>
@@ -1608,6 +1575,46 @@ const App = (() => {
     </body></html>`;
   }
 
+  // ── FOURNISSEURS CHIPS ───────────────────────────────────────────────────
+  function renderFourniChips(pid, cid, entry) {
+    const active = normFournisseurs(entry).filter(f => f.nom);
+    const activeNoms = active.map(f => f.nom);
+    const amountRows = active.map(f => `
+      <div class="field-row">
+        <span class="field-label" style="font-size:14px">🏭 ${esc(f.nom)}</span>
+        <input type="number" class="field-input" placeholder="0,00"
+          value="${esc(f.montant)}" step="0.01" min="0" inputmode="decimal"
+          oninput="App.onFourniAmount('${pid}','${cid}','${f.nom}',this.value)">
+      </div>`).join('');
+    return `
+      <div class="field-row fourni-chip-row">
+        <span class="field-label">🏭 Fournisseur</span>
+        <div class="fourni-chips">
+          ${FOURNISSEURS.map(nom => `
+            <button class="fourni-chip ${activeNoms.includes(nom) ? 'active' : ''}"
+              onclick="App.toggleFourni('${pid}','${cid}','${nom}')">
+              ${nom}
+            </button>`).join('')}
+        </div>
+      </div>
+      ${amountRows}`;
+  }
+
+  function toggleFourni(pid, cid, nom) {
+    const e = _ensureEntry(pid, cid);
+    e.fournisseurs = normFournisseurs(e).filter(f => f.nom); // purge vides
+    const idx = e.fournisseurs.findIndex(f => f.nom === nom);
+    if (idx >= 0) e.fournisseurs.splice(idx, 1);
+    else          e.fournisseurs.push({ nom, montant: '' });
+    save(); render();
+  }
+
+  function onFourniAmount(pid, cid, nom, value) {
+    const e = _ensureEntry(pid, cid);
+    const f = e.fournisseurs.find(x => x.nom === nom);
+    if (f) { f.montant = value; save(); updateCard(pid, cid); }
+  }
+
   // ── FOURNISSEURS MULTI ───────────────────────────────────────────────────
   function _ensureEntry(pid, cid) {
     const k = eKey(pid, S.date);
@@ -1793,7 +1800,7 @@ const App = (() => {
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
     exportData, importData, closeModal, toggleTheme,
-    addFourni, removeFourni, onFourni,
+    toggleFourni, onFourniAmount,
     prevMonth, nextMonth, validateCard, exportPDF,
     subscribeToPush,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
