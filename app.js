@@ -19,6 +19,7 @@ const App = (() => {
     pharmacies: [], entries: {},
     pharmacyId: null, date: today(),
     view: 'day', detailPid: null, detailDate: null,
+    month: new Date().toISOString().slice(0, 7),
   };
 
   const FOURNISSEURS = ['EXPERT', 'PARA2000', '2A PARA'];
@@ -29,7 +30,14 @@ const App = (() => {
   const IS_EMP = !!(EMP.pid && EMP.cid);
 
   // ── HELPERS ─────────────────────────────────────────────────────────────
-  function today() { return new Date().toISOString().split('T')[0]; }
+  function today()        { return new Date().toISOString().split('T')[0]; }
+  function currentMonth() { return new Date().toISOString().slice(0, 7); }
+
+  function fmtMonth(m) {
+    const [y, mo] = m.split('-');
+    return new Date(Number(y), Number(mo) - 1, 1)
+      .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  }
 
   function fmtDate(d) {
     if (!d) return '';
@@ -197,6 +205,7 @@ const App = (() => {
     let title = 'PharmaCaisse', showBack = false;
     if (S.view === 'day')        title = pharmacy?.name ?? 'PharmaCaisse';
     if (S.view === 'history')    title = 'Historique';
+    if (S.view === 'month')      title = 'Résumé';
     if (S.view === 'settings')   title = 'Réglages';
     if (S.view === 'histDetail') { title = fmtDate(S.detailDate); showBack = true; }
 
@@ -215,6 +224,7 @@ const App = (() => {
               ? `<div class="desk-nav">
                   <button class="desk-nav-btn ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">📋 Saisie</button>
                   <button class="desk-nav-btn ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">📅 Historique</button>
+                  <button class="desk-nav-btn ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">📊 Résumé</button>
                   <button class="desk-nav-btn ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">⚙️ Réglages</button>
                 </div>`
               : ''}
@@ -231,6 +241,9 @@ const App = (() => {
         <button class="tab-item ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">
           <span class="tab-icon">📅</span>Historique
         </button>
+        <button class="tab-item ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">
+          <span class="tab-icon">📊</span>Résumé
+        </button>
         <button class="tab-item ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">
           <span class="tab-icon">⚙️</span>Réglages
         </button>
@@ -244,6 +257,7 @@ const App = (() => {
     if (S.view === 'day')        return renderDay(p);
     if (S.view === 'history')    return renderHistory(p);
     if (S.view === 'histDetail') return renderDetail();
+    if (S.view === 'month')      return renderMonth(p);
     if (S.view === 'settings')   return renderSettings();
     return '';
   }
@@ -336,11 +350,13 @@ const App = (() => {
     const c = calc(entry);
     const pid = pharmacy.id, cid = caisse.id;
 
-    const cardCls  = c.hasData ? (c.isValid ? 'ok' : 'bad') : '';
-    const pillCls  = c.hasData ? (c.isValid ? 'pill-ok' : 'pill-bad') : 'pill-idle';
-    const pillTxt  = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente';
-    const showDiff = !c.isValid && c.hasData && c.sobrusOk;
-    const delay    = idx * 0.07;
+    const validated = !!entry.validated;
+    const isOk      = c.isValid || validated;
+    const cardCls   = c.hasData ? (isOk ? 'ok' : 'bad') : '';
+    const pillCls   = c.hasData ? (isOk ? 'pill-ok' : 'pill-bad') : 'pill-idle';
+    const pillTxt   = c.hasData ? (c.isValid ? '✓ Équilibré' : validated ? '✓ Validé' : '✗ Écart') : 'En attente';
+    const showDiff  = !isOk && c.hasData && c.sobrusOk;
+    const delay     = idx * 0.07;
 
     return `
     <div class="pc ${cardCls}" id="card-${cid}" style="animation-delay:${delay}s">
@@ -463,9 +479,14 @@ const App = (() => {
         <span class="save-status" id="ft-${cid}">
           ${entry.savedAt ? `✓ Sauvegardé à ${fmtTime(entry.savedAt)}` : ''}
         </span>
-        <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
-          Sauvegarder
-        </button>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${!c.isValid && c.hasData && c.sobrusOk && !validated
+            ? `<button class="btn btn-validate btn-sm" onclick="App.validateCard('${pid}','${cid}')">Valider</button>`
+            : ''}
+          <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
+            Sauvegarder
+          </button>
+        </div>
       </div>
     </div>`;
   }
@@ -590,6 +611,113 @@ const App = (() => {
     return `
       <div class="sec-caption">${esc(pharmacy.name)}</div>
       ${cards || empty('📋', 'Aucune donnée', '')}`;
+  }
+
+  // ── MONTH VIEW ───────────────────────────────────────────────────────────
+  function calcMonthTotals(pharmacy) {
+    const prefix = `${pharmacy.id}|${S.month}`;
+    let sobrus = 0, espece = 0, tpe = 0, cheque = 0, fourni = 0,
+        depenses = 0, remise = 0, ecartCount = 0, ecartSum = 0,
+        okCount = 0, dayCount = 0;
+    Object.entries(S.entries)
+      .filter(([k]) => k.startsWith(prefix) && Object.keys(S.entries[k]).length > 0)
+      .forEach(([, day]) => {
+        dayCount++;
+        pharmacy.caisses.forEach(c => {
+          const entry = day[c.id]; if (!entry) return;
+          const r = calc(entry); if (!r.hasData) return;
+          sobrus   += r.sobrus;   espece += r.espece; tpe     += r.tpe;
+          cheque   += r.cheque;   fourni += r.fourni; depenses+= r.depenses;
+          remise   += r.remise;
+          if (r.isValid || entry.validated) okCount++;
+          else if (r.sobrusOk) { ecartCount++; ecartSum += r.diff; }
+        });
+      });
+    return { sobrus, espece, tpe, cheque, fourni, depenses, remise,
+             ecartCount, ecartSum, okCount, dayCount };
+  }
+
+  function renderMonth(pharmacy) {
+    if (!pharmacy) return empty('📊', 'Aucune pharmacie', '');
+
+    const t = calcMonthTotals(pharmacy);
+    const prefix  = `${pharmacy.id}|${S.month}`;
+    const days    = Object.keys(S.entries)
+      .filter(k => k.startsWith(prefix) && Object.keys(S.entries[k]).length > 0)
+      .map(k => k.slice(pharmacy.id.length + 1)).sort().reverse();
+    const canNext = S.month < currentMonth();
+    const totalCaisses = t.okCount + t.ecartCount;
+    const totalDetail  = t.espece + t.tpe + t.cheque + t.fourni + t.depenses + t.remise;
+
+    const dayRows = days.map(date => {
+      const day  = dayData(pharmacy.id, date);
+      const vals = Object.values(day);
+      const cnt  = vals.length;
+      const bad  = vals.filter(e => { const r = calc(e); return r.hasData && !r.isValid && !e.validated; }).length;
+      const allOk = cnt > 0 && vals.every(e => { const r = calc(e); return r.isValid || e.validated; });
+      const dot  = allOk ? 'sd-ok' : bad > 0 ? 'sd-bad' : 'sd-warn';
+      const lbl  = allOk ? 'Tout équilibré' : bad > 0 ? `${bad} écart${bad>1?'s':''}` : 'En cours';
+      return `
+        <div class="list-row" onclick="App.showDetail('${pharmacy.id}','${date}')">
+          <div class="status-dot ${dot}"></div>
+          <div>
+            <div class="row-main">${fmtDate(date)}</div>
+            <div class="row-sub">${cnt} caisse${cnt>1?'s':''} · ${lbl}</div>
+          </div>
+          <div class="row-chev">›</div>
+        </div>`;
+    }).join('');
+
+    return `
+      ${renderSegment()}
+      <div class="date-nav">
+        <button class="date-arrow" onclick="App.prevMonth()">‹</button>
+        <div class="date-center">
+          <div class="date-main" style="text-transform:capitalize">${fmtMonth(S.month)}</div>
+          <div class="date-sub">${t.dayCount} jour${t.dayCount!==1?'s':''} saisi${t.dayCount!==1?'s':''} · ${totalCaisses} caisse${totalCaisses!==1?'s':''}</div>
+        </div>
+        <button class="date-arrow ${!canNext ? 'off' : ''}" onclick="App.nextMonth()">›</button>
+      </div>
+
+      ${t.dayCount === 0
+        ? empty('📊', 'Aucune donnée', 'Aucune saisie pour ce mois.')
+        : `<div class="sec-caption">Totaux du mois</div>
+           <div class="month-totals">
+             <div class="month-row">
+               <span class="month-key">💊 Total Sobrus</span>
+               <span class="month-val month-primary">${fmt(t.sobrus)}</span>
+             </div>
+             <div class="month-row">
+               <span class="month-key">💵 Espèce</span>
+               <span class="month-val">${fmt(t.espece)}</span>
+             </div>
+             <div class="month-row">
+               <span class="month-key">💳 TPE</span>
+               <span class="month-val">${fmt(t.tpe)}</span>
+             </div>
+             <div class="month-row">
+               <span class="month-key">🏦 Chèque</span>
+               <span class="month-val">${fmt(t.cheque)}</span>
+             </div>
+             ${t.fourni > 0 ? `<div class="month-row"><span class="month-key">🏭 Fournisseurs</span><span class="month-val">${fmt(t.fourni)}</span></div>` : ''}
+             ${t.depenses > 0 ? `<div class="month-row"><span class="month-key">💸 Dépenses</span><span class="month-val">${fmt(t.depenses)}</span></div>` : ''}
+             ${t.remise > 0 ? `<div class="month-row"><span class="month-key">🏷 Remises</span><span class="month-val">${fmt(t.remise)}</span></div>` : ''}
+             <div class="month-row month-sep">
+               <span class="month-key" style="font-weight:700;color:var(--t1)">Total Détail</span>
+               <span class="month-val month-primary">${fmt(totalDetail)}</span>
+             </div>
+             ${t.ecartCount > 0
+               ? `<div class="month-row bad">
+                    <span class="month-key">⚠ Écarts (${t.ecartCount} caisse${t.ecartCount>1?'s':''})</span>
+                    <span class="month-val">${fmtD(t.ecartSum)}</span>
+                  </div>`
+               : `<div class="month-row ok">
+                    <span class="month-key">✓ Aucun écart</span>
+                    <span class="month-val">${t.okCount} équilibrée${t.okCount>1?'s':''}</span>
+                  </div>`}
+           </div>
+           <div class="sec-caption">Journées</div>
+           <div class="list-card">${dayRows}</div>`}`;
   }
 
   // ── SETTINGS ────────────────────────────────────────────────────────────
@@ -760,6 +888,26 @@ const App = (() => {
   function setView(v)  { S.view = v; render(); window.scrollTo(0, 0); }
   function back()      { if (S.view === 'histDetail') { S.view = 'history'; render(); } }
   function selectPharmacy(id) { S.pharmacyId = id; render(); }
+
+  function prevMonth() {
+    const [y, m] = S.month.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    S.month = d.toISOString().slice(0, 7); render(); window.scrollTo(0, 0);
+  }
+  function nextMonth() {
+    const [y, m] = S.month.split('-').map(Number);
+    const next = new Date(y, m, 1).toISOString().slice(0, 7);
+    if (next > currentMonth()) return;
+    S.month = next; render(); window.scrollTo(0, 0);
+  }
+
+  function validateCard(pid, cid) {
+    const k = eKey(pid, S.date);
+    if (!S.entries[k]?.[cid]) return;
+    S.entries[k][cid].validated = true;
+    save(); render();
+    toast('✓ Caisse validée');
+  }
 
   function prevDay() {
     const d = new Date(S.date + 'T12:00:00'); d.setDate(d.getDate() - 1);
@@ -993,5 +1141,6 @@ const App = (() => {
     addCaisse, renameCaisse, deleteCaisse,
     exportData, importData, closeModal, toggleTheme, copyEmpLink,
     addFourni, removeFourni, onFourni,
+    prevMonth, nextMonth, validateCard,
   };
 })();

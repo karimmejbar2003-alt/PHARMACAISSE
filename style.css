@@ -938,6 +938,39 @@ html, body {
   .desk-nav { display: none; }
 }
 
+/* ── MONTH RESUME ─────────────────────────────────────────────── */
+.month-totals {
+  margin: 0 var(--gutter) 14px;
+  background: var(--bg-elevated);
+  border-radius: var(--r-xl);
+  border: 0.5px solid var(--border);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
+}
+
+.month-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 13px 18px;
+  border-bottom: 0.5px solid var(--sep);
+  font-size: 15px;
+}
+.month-row:last-child { border-bottom: none; }
+.month-row.ok  { color: var(--ok);  font-weight: 600; }
+.month-row.bad { color: var(--bad); font-weight: 600; }
+.month-row.month-sep { border-top: 1px solid var(--border); padding-top: 14px; }
+
+.month-key { color: var(--t2); font-size: 14px; }
+.month-val { font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+.month-primary { font-size: 16px; font-weight: 700; color: var(--t1); }
+
+/* ── VALIDATE BUTTON ───────────────────────────────────────────── */
+.btn-validate {
+  background: rgba(40, 205, 65, 0.12);
+  color: var(--ok);
+  border: 0.5px solid rgba(40, 205, 65, 0.30);
+}
+.btn-validate:hover { background: rgba(40, 205, 65, 0.20); }
+
 /* ── DAY TOTAL CARD ───────────────────────────────────────────── */
 .day-total {
   margin: 4px var(--gutter) 4px;
