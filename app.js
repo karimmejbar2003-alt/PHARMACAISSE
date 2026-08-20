@@ -564,15 +564,19 @@ const App = (() => {
 
       <nav class="tabbar">
         <button class="tab-item ${S.view === 'day' ? 'active' : ''}" onclick="App.setView('day')">
+          <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3" width="13" height="14" rx="2.5"/><line x1="6.5" y1="7" x2="13.5" y2="7"/><line x1="6.5" y1="10" x2="11" y2="10"/><line x1="6.5" y1="13" x2="12.5" y2="13"/></svg></span>
           Saisie
         </button>
         <button class="tab-item ${['history','histDetail'].includes(S.view) ? 'active' : ''}" onclick="App.setView('history')">
+          <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="14" height="12.5" rx="2"/><line x1="3" y1="8.5" x2="17" y2="8.5"/><line x1="7" y1="2.5" x2="7" y2="6.5"/><line x1="13" y1="2.5" x2="13" y2="6.5"/></svg></span>
           Historique
         </button>
         <button class="tab-item ${S.view === 'month' ? 'active' : ''}" onclick="App.setView('month')">
+          <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,15 7,9.5 11,12.5 17.5,5"/><circle cx="2.5" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="7" cy="9.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="11" cy="12.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="17.5" cy="5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
           Résumé
         </button>
         <button class="tab-item ${S.view === 'settings' ? 'active' : ''}" onclick="App.setView('settings')">
+          <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18M4.22 4.22l1.77 1.77M14.01 14.01l1.77 1.77M15.78 4.22l-1.77 1.77M5.99 14.01l-1.77 1.77"/></svg></span>
           Réglages
         </button>
       </nav>`;
