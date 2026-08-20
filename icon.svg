@@ -1,5 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="90" fill="#1e40af"/>
-  <rect x="206" y="100" width="100" height="312" rx="18" fill="white"/>
-  <rect x="100" y="206" width="312" height="100" rx="18" fill="white"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16C262"/>
+      <stop offset="100%" stop-color="#009A44"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#g)"/>
+  <!-- Staff -->
+  <line x1="256" y1="72" x2="256" y2="440" stroke="white" stroke-width="22" stroke-linecap="round"/>
+  <!-- Knob -->
+  <circle cx="256" cy="72" r="20" fill="white"/>
+  <!-- Wings -->
+  <path d="M256 132 C185 96 135 150 190 168" stroke="white" stroke-width="18" fill="none" stroke-linecap="round"/>
+  <path d="M256 132 C327 96 377 150 322 168" stroke="white" stroke-width="18" fill="none" stroke-linecap="round"/>
+  <!-- Snake 1 -->
+  <path d="M256 155 C180 195 180 245 256 268 C332 291 332 341 256 375" stroke="white" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <!-- Snake 2 -->
+  <path d="M256 155 C332 195 332 245 256 268 C180 291 180 341 256 375" stroke="white" stroke-width="16" fill="none" stroke-linecap="round"/>
 </svg>

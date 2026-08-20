@@ -859,10 +859,10 @@ html, body {
 
 .splash-icon {
   width: 80px; height: 80px;
-  background: var(--accent);
+  background: linear-gradient(160deg, #16C262 0%, #009A44 100%);
   border-radius: 20px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 8px 32px rgba(0,113,227,0.35),
+  box-shadow: 0 8px 32px rgba(0,154,68,0.40),
     inset 0 1px 0 rgba(255,255,255,0.25);
   animation: iconIn 0.5s var(--spring);
 }

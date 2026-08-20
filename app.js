@@ -1968,9 +1968,13 @@ const App = (() => {
     document.getElementById('app').innerHTML = `
       <div class="splash">
         <div class="splash-icon">
-          <svg width="44" height="44" viewBox="0 0 20 20" fill="none">
-            <rect x="8.5" y="2" width="3" height="16" rx="1.5" fill="white"/>
-            <rect x="2" y="8.5" width="16" height="3" rx="1.5" fill="white"/>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <line x1="22" y1="5" x2="22" y2="40" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="22" cy="5" r="2" fill="white"/>
+            <path d="M22 11 C14 7 10 14 16 16" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <path d="M22 11 C30 7 34 14 28 16" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <path d="M22 14 C14 19 14 25 22 27 C30 29 30 35 22 38" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <path d="M22 14 C30 19 30 25 22 27 C14 29 14 35 22 38" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
           </svg>
         </div>
         <div class="splash-name">PharmaCaisse</div>
