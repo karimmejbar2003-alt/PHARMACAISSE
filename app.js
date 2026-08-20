@@ -19,7 +19,7 @@ const App = (() => {
     pharmacies: [], entries: {},
     pharmacyId: null, date: today(),
     view: 'day', detailPid: null, detailDate: null,
-    month: new Date().toISOString().slice(0, 7),
+    month: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })(),
   };
 
   const FOURNISSEURS = ['EXPERT', 'PARA2000', '2A PARA'];
@@ -141,11 +141,11 @@ const App = (() => {
 
   // ── HELPERS ─────────────────────────────────────────────────────────────
   function today()        { return new Date().toISOString().split('T')[0]; }
-  function currentMonth() { return new Date().toISOString().slice(0, 7); }
+  function currentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 
   function fmtMonth(m) {
-    const [y, mo] = m.split('-');
-    return new Date(Number(y), Number(mo) - 1, 1)
+    const [y, mo] = m.split('-').map(Number);
+    return new Date(y, mo - 1, 15)
       .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   }
 
@@ -797,6 +797,13 @@ const App = (() => {
         >${esc(entry.remarque)}</textarea>
       </div>
 
+      ${entry._log?.length ? `
+      <div class="card-log">
+        ${[...entry._log].reverse().slice(0,3).map(l =>
+          `<div class="card-log-row"><span>${esc(l.a)}</span><span>${fmtTime(l.t)}</span></div>`
+        ).join('')}
+      </div>` : ''}
+
       <div class="pc-footer">
         <span class="save-status" id="ft-${cid}">
           ${entry.savedAt ? `✓ Sauvegardé à ${fmtTime(entry.savedAt)}` : ''}
@@ -804,8 +811,8 @@ const App = (() => {
         <div style="display:flex;gap:8px;align-items:center">
           ${!c.isValid && c.hasData && c.sobrusOk
             ? vu
-              ? `<span class="vu-badge">👁 Vu</span>`
-              : `<button class="btn btn-vu btn-sm" onclick="App.validateCard('${pid}','${cid}')">👁 Marquer vu</button>`
+              ? `<span class="vu-badge">Vu</span>`
+              : `<button class="btn btn-vu btn-sm" onclick="App.validateCard('${pid}','${cid}')">Marquer vu</button>`
             : ''}
           <button class="btn btn-primary btn-sm" onclick="App.saveCard('${pid}','${cid}')">
             Sauvegarder
@@ -931,6 +938,7 @@ const App = (() => {
           ${entry.remarque ? `<div class="det-note">${esc(entry.remarque)}</div>` : ''}
           ${entry._log?.length ? `
           <div class="det-log">
+            <div class="det-log-title">Journal</div>
             ${[...entry._log].reverse().map(l =>
               `<div class="det-log-row"><span>${esc(l.a)}</span><span>${fmtTime(l.t)}</span></div>`
             ).join('')}
@@ -1354,11 +1362,13 @@ const App = (() => {
   function prevMonth() {
     const [y, m] = S.month.split('-').map(Number);
     const d = new Date(y, m - 2, 1);
-    S.month = d.toISOString().slice(0, 7); render(); window.scrollTo(0, 0);
+    S.month = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    render(); window.scrollTo(0, 0);
   }
   function nextMonth() {
     const [y, m] = S.month.split('-').map(Number);
-    const next = new Date(y, m, 1).toISOString().slice(0, 7);
+    const d = new Date(y, m, 1);
+    const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if (next > currentMonth()) return;
     S.month = next; render(); window.scrollTo(0, 0);
   }
@@ -1767,27 +1777,26 @@ const App = (() => {
 
   // ── FOURNISSEURS CHIPS ───────────────────────────────────────────────────
   function renderFourniChips(pid, cid, entry) {
-    const active = normFournisseurs(entry).filter(f => f.nom);
+    const active     = normFournisseurs(entry).filter(f => f.nom);
     const activeNoms = active.map(f => f.nom);
-    const amountRows = active.map(f => `
-      <div class="field-row">
-        <span class="field-label" style="font-size:14px">${esc(f.nom)}</span>
-        <input type="number" class="field-input" placeholder="0,00"
-          value="${esc(f.montant)}" step="0.01" min="0" inputmode="decimal"
-          oninput="App.onFourniAmount('${pid}','${cid}','${f.nom}',this.value)">
-      </div>`).join('');
-    return `
-      <div class="field-row fourni-chip-row">
-        <span class="field-label">Fournisseur</span>
-        <div class="fourni-chips">
-          ${FOURNISSEURS.map(nom => `
-            <button class="fourni-chip ${activeNoms.includes(nom) ? 'active' : ''}"
-              onclick="App.toggleFourni('${pid}','${cid}','${nom}')">
-              ${nom}
-            </button>`).join('')}
-        </div>
-      </div>
-      ${amountRows}`;
+    const rows = FOURNISSEURS.map(nom => {
+      const on = activeNoms.includes(nom);
+      const f  = active.find(x => x.nom === nom);
+      return `
+        <div class="field-row fourni-row">
+          <button class="fourni-toggle ${on ? 'on' : ''}"
+            onclick="App.toggleFourni('${pid}','${cid}','${nom}')">
+            <span class="fourni-check">${on ? '✓' : ''}</span>
+            ${esc(nom)}
+          </button>
+          <input type="number" class="field-input ${on ? '' : 'fourni-off'}"
+            placeholder="0,00" value="${esc(f?.montant || '')}"
+            step="0.01" min="0" inputmode="decimal"
+            ${on ? '' : 'disabled'}
+            oninput="App.onFourniAmount('${pid}','${cid}','${nom}',this.value)">
+        </div>`;
+    }).join('');
+    return `<div class="fields-label">Fournisseurs</div>${rows}`;
   }
 
   function toggleFourni(pid, cid, nom) {
