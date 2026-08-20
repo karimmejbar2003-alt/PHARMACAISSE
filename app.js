@@ -966,34 +966,51 @@ const App = (() => {
       return { date, sobrus, detail, hasEcart };
     });
 
+    const W = 600, H = 160, PAD = 36, BOTTOM = 24, TOP = 12;
+    const chartH = H - BOTTOM - TOP;
+    const chartW = W - PAD * 2;
     const maxVal = Math.max(...data.map(d => Math.max(d.sobrus, d.detail)), 1);
-    const W = 600, H = 120, PAD = 24, BOTTOM = 20;
-    const bw  = Math.max(4, Math.floor((W - PAD * 2) / (data.length * 1.5)));
-    const gap  = Math.floor((W - PAD * 2 - bw * data.length) / (data.length + 1));
 
-    const bars = data.map((d, i) => {
-      const x   = PAD + gap + i * (bw + gap);
-      const bh  = Math.max(2, ((d.sobrus || d.detail) / maxVal) * (H - BOTTOM - 10));
-      const y   = H - BOTTOM - bh;
-      const col = d.sobrus > 0 ? (d.hasEcart ? 'var(--bad)' : 'var(--ok)') : 'var(--border)';
-      return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="2" fill="${col}" opacity="0.85"/>`;
+    const px = (i) => PAD + (i / (data.length - 1)) * chartW;
+    const py = (v) => TOP + chartH - (v / maxVal) * chartH;
+
+    // Line Sobrus
+    const sobrusPoints = data.map((d, i) => `${px(i)},${py(d.sobrus)}`).join(' ');
+    // Line Détail
+    const detailPoints = data.map((d, i) => `${px(i)},${py(d.detail)}`).join(' ');
+
+    // Dots colorés sur la ligne Sobrus
+    const dots = data.map((d, i) => {
+      if (!d.sobrus && !d.detail) return '';
+      const col = d.hasEcart ? 'var(--bad)' : 'var(--ok)';
+      return `<circle cx="${px(i)}" cy="${py(d.sobrus || d.detail)}" r="3.5" fill="${col}"/>`;
     }).join('');
 
-    // X-axis labels (every ~5 days)
-    const labels = data.filter((_, i) => i % Math.ceil(data.length / 8) === 0).map(d => {
+    // X labels (tous les N jours selon densité)
+    const step = Math.max(1, Math.ceil(data.length / 7));
+    const labels = data.filter((_, i) => i % step === 0 || i === data.length - 1).map((d, _, arr) => {
       const i = data.indexOf(d);
-      const x = PAD + gap + i * (bw + gap) + bw / 2;
-      return `<text x="${x}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--t2)">${fmtDate(d.date).slice(0,5)}</text>`;
+      return `<text x="${px(i)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--t2)">${fmtDate(d.date).slice(0,5)}</text>`;
     }).join('');
+
+    // Ligne axe X
+    const axis = `<line x1="${PAD}" y1="${H - BOTTOM}" x2="${W - PAD}" y2="${H - BOTTOM}" stroke="var(--border)" stroke-width="1"/>`;
 
     return `
+      <div class="sec-caption">Évolution du mois</div>
       <div class="month-chart-wrap">
         <div class="month-chart-legend">
-          <span class="chart-dot ok"></span>Équilibré
+          <span class="chart-line-sample" style="background:var(--accent)"></span>Total Détail
+          <span class="chart-line-sample" style="background:var(--t3)"></span>Sobrus
+          <span class="chart-dot ok" style="margin-left:8px"></span>Équilibré
           <span class="chart-dot bad"></span>Écart
         </div>
-        <svg viewBox="0 0 ${W} ${H}" class="month-chart" preserveAspectRatio="none">
-          ${bars}${labels}
+        <svg viewBox="0 0 ${W} ${H}" class="month-chart" preserveAspectRatio="xMidYMid meet">
+          ${axis}
+          <polyline points="${sobrusPoints}" fill="none" stroke="var(--t3)" stroke-width="1.8" stroke-dasharray="4,3" stroke-linejoin="round" stroke-linecap="round"/>
+          <polyline points="${detailPoints}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          ${dots}
+          ${labels}
         </svg>
       </div>`;
   }
@@ -1068,8 +1085,7 @@ const App = (() => {
         <div class="top-actions">
           <button class="btn btn-secondary btn-sm" onclick="App.exportCSV('month')">CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('month')">PDF</button>
-        </div>
-        ${renderMonthChart(pharmacy, days)}` : ''}
+        </div>` : ''}
 
       ${t.dayCount === 0
         ? empty('—', 'Aucune donnée', 'Aucune saisie pour ce mois.')
@@ -1110,7 +1126,8 @@ const App = (() => {
            </div>
            <div class="sec-caption">Journées</div>
            <div class="list-card">${dayRows}</div>
-           ${renderMonthDetailTable(pharmacy, days)}`}`;
+           ${renderMonthDetailTable(pharmacy, days)}
+           ${renderMonthChart(pharmacy, days)}`}`;
   }
 
   function renderMonthDetailTable(pharmacy, days) {
