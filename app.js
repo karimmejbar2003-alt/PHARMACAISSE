@@ -384,7 +384,7 @@ const App = (() => {
     const session = getEmpSession();
     if (!session) { renderLoginPage(); return; }
     document.body.classList.add('emp-mode');
-    S.date = today(); // employee always fills for today
+    if (!S.date || S.date > today()) S.date = today(); // init seulement
 
     const pharmacy = S.pharmacies.find(p => p.id === session.pharmacyId);
     const caisse   = pharmacy?.caisses.find(c => c.id === session.caisseId);
@@ -400,6 +400,7 @@ const App = (() => {
       return;
     }
 
+    const isToday = S.date >= today();
     document.getElementById('app').innerHTML = `
       <div class="emp-topbar">
         <span class="emp-topbar-name">${esc(session.name)}</span>
@@ -409,7 +410,13 @@ const App = (() => {
         <div class="emp-header">
           <div class="emp-pharma">${esc(pharmacy.name)}</div>
           <div class="emp-name">${esc(caisse.name)}</div>
-          <div class="emp-date">${fmtDateLong(S.date)}</div>
+        </div>
+        <div class="emp-date-nav">
+          <button class="date-arrow" onclick="App.empPrevDay()">‹</button>
+          <div class="emp-date-label">
+            ${isToday ? 'Aujourd\'hui' : fmtDateLong(S.date)}
+          </div>
+          <button class="date-arrow ${isToday ? 'off' : ''}" onclick="App.empNextDay()">›</button>
         </div>
         <div class="emp-grid">${renderEmpCard(pharmacy, caisse)}</div>
         ${!localStorage.getItem('emp_push_sub') ? `
@@ -520,6 +527,18 @@ const App = (() => {
     }
 
     renderEmpDashboard();
+  }
+
+  function empPrevDay() {
+    const d = new Date(S.date + 'T12:00:00'); d.setDate(d.getDate() - 1);
+    S.date = d.toISOString().split('T')[0];
+    renderEmpDashboard(); window.scrollTo(0, 0);
+  }
+  function empNextDay() {
+    if (S.date >= today()) return;
+    const d = new Date(S.date + 'T12:00:00'); d.setDate(d.getDate() + 1);
+    S.date = d.toISOString().split('T')[0];
+    renderEmpDashboard(); window.scrollTo(0, 0);
   }
 
   function empLogout() {
@@ -814,7 +833,11 @@ const App = (() => {
         <span class="save-status" id="ft-${cid}">
           ${entry.savedAt ? `✓ Sauvegardé à ${fmtTime(entry.savedAt)}` : ''}
         </span>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          ${entry.lockedByEmp ? `
+            <button class="btn btn-muted btn-sm" onclick="App.unlockForEmp('${pid}','${cid}')" title="Permet à l'employé de modifier ce jour">
+              Déverrouiller
+            </button>` : ''}
           ${!c.isValid && c.hasData && c.sobrusOk
             ? vu
               ? `<span class="vu-badge">Vu</span>`
@@ -1406,6 +1429,15 @@ const App = (() => {
     S.entries[k][cid].validated = true;
     save(); render();
     toast('✓ Caisse validée');
+  }
+
+  function unlockForEmp(pid, cid) {
+    const k = eKey(pid, S.date);
+    if (!S.entries[k]?.[cid]) return;
+    S.entries[k][cid].lockedByEmp = false;
+    addLog(S.entries[k][cid], 'Déverrouillé par patron', new Date().toISOString());
+    save(); render();
+    toast('Jour déverrouillé — l\'employé peut modifier');
   }
 
   function prevDay() {
@@ -2036,7 +2068,8 @@ const App = (() => {
     subscribeToPush, sendReminder, empSubscribePush,
     exportCSV, lockDay, unlockDay,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
-    empLogout, submitEmpCard, copyLoginLink,
+    empLogout, empPrevDay, empNextDay, submitEmpCard, copyLoginLink,
+    unlockForEmp,
     addEmployee, editEmployee, saveEmployee, deleteEmployee,
   };
 })();

@@ -1307,6 +1307,17 @@ html, body {
   border-top: 0.5px solid var(--sep);
 }
 
+/* ── EMPLOYEE DATE NAV ─────────────────────────────────────────── */
+.emp-date-nav {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; padding: 10px var(--gutter) 6px;
+}
+.emp-date-label {
+  font-size: 16px; font-weight: 600; color: var(--t1);
+  letter-spacing: -0.3px; text-transform: capitalize;
+  flex: 1; text-align: center;
+}
+
 /* ── EMPLOYEE TOPBAR ───────────────────────────────────────────── */
 .emp-topbar {
   display: flex; align-items: center; justify-content: space-between;
