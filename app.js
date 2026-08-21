@@ -36,6 +36,11 @@ const App = (() => {
 
   async function subscribeToPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (isIOS && !isPWA()) {
+        return showInfoSheet('Installer l\'app d\'abord',
+          '1. Bouton Partager ↑ dans Safari\n2. "Sur l\'écran d\'accueil"\n3. Rouvrez depuis l\'icône');
+      }
       return toast('⚠ Notifications non supportées sur ce navigateur');
     }
     const perm = await Notification.requestPermission();
@@ -89,8 +94,22 @@ const App = (() => {
     toast(`Rappel envoyé à ${caisse.name}`);
   }
 
+  function isPWA() {
+    return window.navigator.standalone === true
+        || window.matchMedia('(display-mode: standalone)').matches;
+  }
+
   async function empSubscribePush() {
-    if (!('PushManager' in window)) return toast('Non supporté sur ce navigateur');
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (!('PushManager' in window)) {
+      if (isIOS && !isPWA()) {
+        return showInfoSheet(
+          'Installer l\'app d\'abord',
+          'Sur iPhone, les notifications nécessitent que l\'app soit installée sur l\'écran d\'accueil.\n\n1. Appuyez sur le bouton Partager (⬆️) dans Safari\n2. "Sur l\'écran d\'accueil"\n3. Rouvrez l\'app depuis l\'icône'
+        );
+      }
+      return toast('Notifications non supportées sur ce navigateur');
+    }
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') return toast('Permission refusée');
     try {
@@ -1428,6 +1447,23 @@ const App = (() => {
   }
 
   function closeModal() { document.getElementById('modal-overlay')?.remove(); }
+
+  function showInfoSheet(title, message) {
+    closeModal();
+    const el = document.createElement('div');
+    el.className = 'sheet-overlay'; el.id = 'modal-overlay';
+    el.innerHTML = `
+      <div class="sheet">
+        <div class="sheet-pull"></div>
+        <div class="sheet-title">${esc(title)}</div>
+        <div class="sheet-msg" style="white-space:pre-line;text-align:left;padding:0 24px 20px">${esc(message)}</div>
+        <div class="sheet-actions">
+          <button class="sheet-btn confirm" onclick="App.closeModal()">Compris</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    el.addEventListener('pointerdown', e => { if (e.target === el) closeModal(); });
+  }
 
   // ── TOAST ───────────────────────────────────────────────────────────────
   let _tt;
