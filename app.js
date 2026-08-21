@@ -73,6 +73,17 @@ const App = (() => {
       && Notification.permission === 'granted';
   }
 
+  async function resubscribePush() {
+    localStorage.removeItem('push_subscribed');
+    // Désabonner l'ancien SW si existant
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+    } catch {}
+    await subscribeToPush();
+  }
+
   async function sendReminder(pid, cid) {
     if (!db) return toast('Firebase non connecté');
     const pharmacy = S.pharmacies.find(p => p.id === pid); if (!pharmacy) return;
@@ -1366,7 +1377,10 @@ const App = (() => {
             <div class="set-row-sub">${isPushSubscribed() ? 'Activées — vous serez notifié à chaque envoi employé' : 'Recevez une alerte quand un employé envoie ses chiffres'}</div>
           </div>
           ${isPushSubscribed()
-            ? `<span class="pill pill-ok" style="flex-shrink:0"><div class="pill-dot"></div>Activées</span>`
+            ? `<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+                <span class="pill pill-ok"><div class="pill-dot"></div>Activées</span>
+                <button class="btn btn-muted btn-sm" onclick="App.resubscribePush()">Réactiver</button>
+               </div>`
             : `<button class="btn btn-primary btn-sm" onclick="App.subscribeToPush()">Activer</button>`}
         </div>
       </div>
@@ -2183,7 +2197,7 @@ const App = (() => {
     exportData, importData, closeModal, toggleTheme,
     toggleFourni, onFourniAmount,
     prevMonth, nextMonth, validateCard, exportPDF,
-    subscribeToPush, sendReminder, empSubscribePush,
+    subscribeToPush, resubscribePush, sendReminder, empSubscribePush,
     exportCSV, lockDay, unlockDay,
     lsPharmacy, lsEmployee, lsPin, lsPinDel, doLogin,
     empLogout, empPrevDay, empNextDay, submitEmpCard, copyLoginLink,
