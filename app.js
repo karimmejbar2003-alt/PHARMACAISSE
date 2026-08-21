@@ -129,9 +129,11 @@ const App = (() => {
   }
 
   // ── EMPLOYEE SESSION ─────────────────────────────────────────────────────
-  const IS_LOGIN_MODE = new URLSearchParams(window.location.search).has('login');
+  const _loginParams   = new URLSearchParams(window.location.search);
+  const IS_LOGIN_MODE  = _loginParams.has('login');
+  const LOGIN_URL_PID  = _loginParams.get('pid') || null;
   const EMP_KEY = 'pharma_emp_session';
-  let _ls = { pid: null, eid: null, pin: '', err: '' }; // login state
+  let _ls = { pid: LOGIN_URL_PID, eid: null, pin: '', err: '' };
 
   function getEmpSession() {
     try { return JSON.parse(localStorage.getItem(EMP_KEY) || 'null'); } catch { return null; }
@@ -306,7 +308,7 @@ const App = (() => {
     const pinDots = '●'.repeat(_ls.pin.length) + '○'.repeat(4 - _ls.pin.length);
 
     // Pharmacy segment (only if multiple)
-    const pharmSeg = S.pharmacies.length > 1 ? `
+    const pharmSeg = S.pharmacies.length > 1 && !LOGIN_URL_PID ? `
       <div class="login-field">
         <div class="login-label">Pharmacie</div>
         <div class="login-pharma-seg">
@@ -1213,17 +1215,21 @@ const App = (() => {
 
       <div class="sec-caption">Employés</div>
       <div class="set-group" style="margin:0 var(--gutter) 6px">
-        <div class="set-row" style="border-bottom:none;gap:0;flex-direction:column;align-items:flex-start">
-          <div class="set-row-sub" style="line-height:1.55;margin-bottom:10px">
-            Lien de connexion à envoyer aux employés :
-          </div>
-          <div style="display:flex;gap:8px;width:100%;align-items:center">
-            <code style="flex:1;font-size:12px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-              ${window.location.origin}${window.location.pathname}?login
-            </code>
-            <button class="btn btn-secondary btn-sm" onclick="App.copyLoginLink()">Copier</button>
+        <div class="set-row" style="border-bottom:none;padding-bottom:8px">
+          <div class="set-row-sub" style="line-height:1.6">
+            Chaque pharmacie a son propre lien — envoyez le bon lien aux bons employés.
           </div>
         </div>
+        ${S.pharmacies.map(p => `
+        <div class="set-row">
+          <div style="flex:1;min-width:0">
+            <div class="set-row-label">${esc(p.name)}</div>
+            <div class="set-row-sub" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              …?login&pid=${p.id}
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="App.copyLoginLink('${p.id}')">Copier</button>
+        </div>`).join('')}
       </div>
       ${S.pharmacies.map(p => {
         const emps = p.employees || [];
@@ -1866,8 +1872,9 @@ const App = (() => {
   }
 
   // ── EMPLOYEE MANAGEMENT ──────────────────────────────────────────────────
-  function copyLoginLink() {
-    const url = window.location.origin + window.location.pathname + '?login';
+  function copyLoginLink(pid) {
+    const base = window.location.origin + window.location.pathname;
+    const url  = pid ? `${base}?login&pid=${encodeURIComponent(pid)}` : `${base}?login`;
     navigator.clipboard?.writeText(url).then(() => toast('✓ Lien copié')).catch(() => fallbackCopy(url));
   }
 
