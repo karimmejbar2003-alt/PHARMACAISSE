@@ -215,8 +215,19 @@ const App = (() => {
     S.pharmacyId = S.pharmacies[0].id;
   }
 
+  let _lastSaveTs  = 0;   // timestamp de notre dernier save
+  let _isTyping    = false;
+  let _typingTimer = null;
+
+  function markTyping() {
+    _isTyping = true;
+    clearTimeout(_typingTimer);
+    _typingTimer = setTimeout(() => { _isTyping = false; }, 3000);
+  }
+
   function save() {
     saveLocal();
+    _lastSaveTs = Date.now();
     if (db) db.doc(FS_DOC).set({ pharmacies: S.pharmacies, entries: S.entries })
       .catch(e => console.warn('FS save:', e.message));
   }
@@ -1452,6 +1463,7 @@ const App = (() => {
   }
 
   function onInput(pid, cid, field, value) {
+    markTyping();
     setField(pid, S.date, cid, field, value);
     updateCard(pid, cid);
   }
@@ -1868,6 +1880,7 @@ const App = (() => {
   }
 
   function onFourniAmount(pid, cid, nom, value) {
+    markTyping();
     const e = _ensureEntry(pid, cid);
     const f = e.fournisseurs.find(x => x.nom === nom);
     if (f) { f.montant = value; save(); updateCard(pid, cid); }
@@ -2043,6 +2056,7 @@ const App = (() => {
 
     await load();
     migrate();
+    setupRealtimeSync(); // écoute les mises à jour en temps réel
 
     if (IS_LOGIN_MODE) {
       document.body.classList.add('emp-mode');
@@ -2053,6 +2067,45 @@ const App = (() => {
     }
 
     render();
+  }
+
+  // ── REALTIME SYNC ────────────────────────────────────────────────────────
+  function setupRealtimeSync() {
+    if (!db) return;
+    let _firstSnap = true;
+
+    db.doc(FS_DOC).onSnapshot(snap => {
+      // Ignorer le snapshot initial (déjà chargé dans load())
+      if (_firstSnap) { _firstSnap = false; return; }
+      if (!snap.exists) return;
+
+      // Ignorer nos propres saves (dans les 5 secondes)
+      if (Date.now() - _lastSaveTs < 5000) return;
+
+      const data = snap.data();
+      if (!data) return;
+
+      // Mettre à jour l'état local
+      if (data.pharmacies?.length) {
+        S.pharmacies = data.pharmacies;
+        S.pharmacyId = S.pharmacies.find(p => p.id === S.pharmacyId)?.id
+                    || S.pharmacies[0]?.id;
+      }
+      if (data.entries) S.entries = data.entries;
+      saveLocal();
+
+      // Mode employé : re-rendre pour détecter un déverrouillage
+      if (IS_LOGIN_MODE) {
+        renderEmpDashboard();
+        return;
+      }
+
+      // Mode patron : re-rendre seulement si pas en train de taper
+      if (!_isTyping) {
+        render();
+        toast('Données reçues en temps réel');
+      }
+    }, err => console.warn('Realtime sync error:', err.message));
   }
 
   document.addEventListener('DOMContentLoaded', init);
