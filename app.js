@@ -132,18 +132,23 @@ const App = (() => {
     try {
       const snap = await db.doc(FS_DOC).get();
       const subs = snap.data()?.pushSubscriptions || [];
+      if (!subs.length) return; // patron n'a pas activé les notifs
       const payload = {
         title: 'PharmaCaisse',
         body: `${empName} a envoyé ses chiffres — ${caisseName} (${pharmacyName})`,
         icon: '/icon-192.png'
       };
-      await Promise.all(subs.map(sub =>
+      const results = await Promise.all(subs.map(sub =>
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub, payload })
-        }).catch(() => {})
+        })
+        .then(r => r.json())
+        .catch(err => ({ error: err.message }))
       ));
+      const errors = results.filter(r => r.error);
+      if (errors.length) console.warn('Push errors:', errors);
     } catch (err) {
       console.warn('Push send error:', err);
     }
