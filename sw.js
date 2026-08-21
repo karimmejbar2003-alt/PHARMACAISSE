@@ -1,4 +1,4 @@
-const CACHE = 'caissepharma-v32';
+const CACHE = 'caissepharma-v33';
 const ASSETS = ['.', 'index.html', 'style.css', 'app.js', 'manifest.json',
                 'icon-180.png', 'icon-192.png', 'icon-512.png', 'firebase-config.js'];
 

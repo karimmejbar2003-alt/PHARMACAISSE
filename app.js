@@ -733,9 +733,9 @@ const App = (() => {
     return `
       ${renderSegment()}
 
-      <div class="date-nav">
+      <div class="date-nav date-nav-sticky">
         <button class="date-arrow" onclick="App.prevDay()">‹</button>
-        <div class="date-center">
+        <div class="date-center" onclick="App.openDatePicker()" style="cursor:pointer" title="Choisir une date">
           <div class="date-main">${fmtDateLong(S.date)}</div>
           <div class="date-sub">${summary}</div>
         </div>
@@ -869,8 +869,8 @@ const App = (() => {
             <span>Total détail</span>
             <span class="result-val" id="rtotal-${cid}">${fmt(c.total)}</span>
           </div>
-          <div class="result-line verdict ${c.isValid ? 'ok' : 'bad'}" id="rcomp-${cid}">
-            <span id="rcomp-label-${cid}">${c.isValid ? '✓ Équilibré avec Sobrus' : '✗ Sobrus attendu'}</span>
+          <div class="result-line verdict ${c.isValid ? 'ok' : ''}" id="rcomp-${cid}">
+            <span id="rcomp-label-${cid}">${c.isValid ? '✓ Équilibré avec Sobrus' : 'Sobrus attendu'}</span>
             <span id="rcomp-val-${cid}">${fmt(c.sobrus)}</span>
           </div>
         </div>
@@ -942,8 +942,8 @@ const App = (() => {
       if (rt) rt.textContent = fmt(c.total);
       const rc = document.getElementById(`rcomp-${cid}`);
       if (rc) {
-        rc.className = `result-line verdict ${c.isValid ? 'ok' : 'bad'}`;
-        document.getElementById(`rcomp-label-${cid}`).textContent = c.isValid ? '✓ Équilibré avec Sobrus' : '✗ Sobrus attendu';
+        rc.className = `result-line verdict ${c.isValid ? 'ok' : ''}`;
+        document.getElementById(`rcomp-label-${cid}`).textContent = c.isValid ? '✓ Équilibré avec Sobrus' : 'Sobrus attendu';
         document.getElementById(`rcomp-val-${cid}`).textContent   = fmt(c.sobrus);
       }
     }
@@ -1530,6 +1530,25 @@ const App = (() => {
     toast('Jour déverrouillé — l\'employé peut modifier');
   }
 
+  function openDatePicker() {
+    const inp = document.createElement('input');
+    inp.type = 'date';
+    inp.value = S.date;
+    inp.max = today();
+    inp.style.cssText = 'position:fixed;opacity:0;top:0;left:0;width:1px;height:1px;pointer-events:none';
+    document.body.appendChild(inp);
+    inp.addEventListener('change', () => {
+      if (inp.value && inp.value <= today()) {
+        S.date = inp.value;
+        render(); window.scrollTo(0, 0);
+      }
+      inp.remove();
+    });
+    inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 300));
+    inp.focus(); inp.click();
+    if (inp.showPicker) inp.showPicker();
+  }
+
   function prevDay() {
     const d = new Date(S.date + 'T12:00:00'); d.setDate(d.getDate() - 1);
     S.date = d.toISOString().split('T')[0]; render();
@@ -1758,7 +1777,10 @@ const App = (() => {
     .total td{font-weight:700;border-top:2px solid #ccc;border-bottom:none;padding-top:9px}
     .sub{font-size:10px;color:#777;margin-top:2px}
     @page{margin:1.5cm}
-    @media print{body{padding:0}}
+    @media print{body{padding:0}.no-print{display:none!important}}
+    .no-print{padding:12px 0 20px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #eee;margin-bottom:20px}
+    .btn-back{padding:8px 18px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;font-family:inherit}
+    .btn-print{padding:8px 18px;border:none;border-radius:8px;background:#0071E3;color:#fff;cursor:pointer;font-size:14px;font-family:inherit}
   `;
 
   function exportPDF(type) {
@@ -1806,6 +1828,10 @@ const App = (() => {
     return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
       <title>${esc(pharmacy.name)} — ${fmtDate(S.date)}</title>
       <style>${PDF_CSS}</style></head><body>
+      <div class="no-print">
+        <button class="btn-back" onclick="window.close()">← Retour</button>
+        <button class="btn-print" onclick="window.print()">Imprimer / Enregistrer PDF</button>
+      </div>
       <div class="hd">
         <h1>${esc(pharmacy.name)}</h1>
         <h2>Récapitulatif journalier</h2>
@@ -1863,6 +1889,10 @@ const App = (() => {
     return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
       <title>${esc(pharmacy.name)} — ${fmtMonth(S.month)}</title>
       <style>${PDF_CSS}</style></head><body>
+      <div class="no-print">
+        <button class="btn-back" onclick="window.close()">← Retour</button>
+        <button class="btn-print" onclick="window.print()">Imprimer / Enregistrer PDF</button>
+      </div>
       <div class="hd">
         <h1>${esc(pharmacy.name)}</h1>
         <h2>Résumé mensuel — ${fmtMonth(S.month)}</h2>
@@ -2190,7 +2220,7 @@ const App = (() => {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    setView, back, prevDay, nextDay, selectPharmacy,
+    setView, back, prevDay, nextDay, openDatePicker, selectPharmacy,
     onInput, saveCard, saveAll, showDetail,
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
