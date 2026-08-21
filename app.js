@@ -639,28 +639,49 @@ const App = (() => {
   }
 
   // ── DAY TOTAL ────────────────────────────────────────────────────────────
+  function ecartCls(diff) {
+    if (Math.abs(diff) < 0.005) return 'ok';
+    return diff > 0 ? 'warn' : 'bad';
+  }
+
   function renderDayTotal(pharmacy) {
-    let totalSobrus = 0, totalDetail = 0, cntSobrus = 0;
+    let tSobrus=0, tEspece=0, tTPE=0, tCheque=0, tFourni=0, tDep=0, tRemise=0, cntSobrus=0;
     pharmacy.caisses.forEach(c => {
       const r = calc(getEntry(pharmacy.id, S.date, c.id));
-      if (r.sobrusOk) { totalSobrus += r.sobrus; cntSobrus++; }
-      if (r.hasData) totalDetail += r.total;
+      if (r.sobrusOk) { tSobrus += r.sobrus; cntSobrus++; }
+      if (r.hasData) {
+        tEspece += r.espece; tTPE += r.tpe; tCheque += r.cheque;
+        tFourni += r.fourni; tDep += r.depenses; tRemise += r.remise;
+      }
     });
-    if (cntSobrus === 0 && totalDetail === 0) return '';
-    const diff = totalDetail - totalSobrus;
+    const tDetail = tEspece + tTPE + tCheque + tFourni + tDep + tRemise;
+    if (cntSobrus === 0 && tDetail === 0) return '';
+    const diff     = tDetail - tSobrus;
     const balanced = cntSobrus > 0 && Math.abs(diff) < 0.005;
+    const cls      = ecartCls(diff);
+
     return `
       <div class="day-total">
+        <div class="day-total-title">Total du jour — ${esc(pharmacy.name)}</div>
         <div class="day-total-row">
           <span class="day-total-label">Total Sobrus</span>
-          <span class="day-total-val">${fmt(totalSobrus)}</span>
+          <span class="day-total-val primary">${fmt(tSobrus)}</span>
         </div>
-        <div class="day-total-row">
+        <div class="day-total-sub">
+          <div class="day-total-sub-row"><span>Espèce</span><span>${fmt(tEspece)}</span></div>
+          <div class="day-total-sub-row"><span>TPE</span><span>${fmt(tTPE)}</span></div>
+          <div class="day-total-sub-row"><span>Chèque</span><span>${fmt(tCheque)}</span></div>
+          ${tFourni > 0 ? `<div class="day-total-sub-row"><span>Fournisseurs</span><span>${fmt(tFourni)}</span></div>` : ''}
+          ${tDep > 0    ? `<div class="day-total-sub-row"><span>Dépenses</span><span>${fmt(tDep)}</span></div>` : ''}
+          ${tRemise > 0 ? `<div class="day-total-sub-row"><span>Remises</span><span>${fmt(tRemise)}</span></div>` : ''}
+        </div>
+        <div class="day-total-row" style="border-top:1px solid var(--border);margin-top:2px">
           <span class="day-total-label">Total Détail</span>
-          <span class="day-total-val">${fmt(totalDetail)}</span>
+          <span class="day-total-val primary">${fmt(tDetail)}</span>
         </div>
-        ${cntSobrus > 0 ? `<div class="day-total-row ${balanced ? 'ok' : 'bad'}">
-          <span>${balanced ? '✓ Tout équilibré' : '⚠ Écart global'}</span>
+        ${cntSobrus > 0 ? `
+        <div class="day-total-row ${cls}" style="font-weight:700">
+          <span>${balanced ? '✓ Tout équilibré' : diff > 0 ? '▲ Excédent' : '▼ Manquant'}</span>
           <span class="day-total-val">${balanced ? '' : fmtD(diff)}</span>
         </div>` : ''}
       </div>`;
@@ -727,11 +748,12 @@ const App = (() => {
     const c = calc(entry);
     const pid = pharmacy.id, cid = caisse.id;
 
-    const vu       = !!entry.validated;
-    const cardCls  = c.hasData ? (c.isValid ? 'ok' : 'bad') : '';
-    const pillCls  = c.hasData ? (c.isValid ? 'pill-ok' : 'pill-bad') : 'pill-idle';
-    const pillTxt  = c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente';
-    const showDiff = !c.isValid && c.hasData && c.sobrusOk;
+    const vu        = !!entry.validated;
+    const diffSign  = c.diff > 0 ? 'pos' : 'neg'; // pos=orange, neg=rouge
+    const cardCls   = c.hasData ? (c.isValid ? 'ok' : diffSign === 'pos' ? 'warn' : 'bad') : '';
+    const pillCls   = c.hasData ? (c.isValid ? 'pill-ok' : diffSign === 'pos' ? 'pill-warn' : 'pill-bad') : 'pill-idle';
+    const pillTxt   = c.hasData ? (c.isValid ? '✓ Équilibré' : diffSign === 'pos' ? '▲ Excédent' : '▼ Manquant') : 'En attente';
+    const showDiff  = !c.isValid && c.hasData && c.sobrusOk;
     const delay     = idx * 0.07;
 
     return `
@@ -817,8 +839,8 @@ const App = (() => {
             <span id="rcomp-val-${cid}">${fmt(c.sobrus)}</span>
           </div>
         </div>
-        <div class="diff-alert" id="diff-${cid}" style="${showDiff ? '' : 'display:none'}">
-          <span>⚠ Écart détecté</span>
+        <div class="diff-alert ${diffSign}" id="diff-${cid}" style="${showDiff ? '' : 'display:none'}">
+          <span>${c.diff > 0 ? '▲ Excédent' : '▼ Manquant'}</span>
           <span id="diffval-${cid}">${showDiff ? fmtD(c.diff) : ''}</span>
         </div>
       </div>
@@ -869,12 +891,13 @@ const App = (() => {
     const card  = document.getElementById(`card-${cid}`);
     if (!card) return;
 
-    card.className = `pc ${c.hasData ? (c.isValid ? 'ok' : 'bad') : ''}`;
+    const ds = c.diff > 0 ? 'pos' : 'neg';
+    card.className = `pc ${c.hasData ? (c.isValid ? 'ok' : ds === 'pos' ? 'warn' : 'bad') : ''}`;
 
     const badge = document.getElementById(`badge-${cid}`);
     if (badge) {
-      badge.className = `pill ${c.hasData ? (c.isValid ? 'pill-ok' : 'pill-bad') : 'pill-idle'}`;
-      badge.innerHTML = `<div class="pill-dot"></div>${c.hasData ? (c.isValid ? '✓ Équilibré' : '✗ Écart') : 'En attente'}`;
+      badge.className = `pill ${c.hasData ? (c.isValid ? 'pill-ok' : ds === 'pos' ? 'pill-warn' : 'pill-bad') : 'pill-idle'}`;
+      badge.innerHTML = `<div class="pill-dot"></div>${c.hasData ? (c.isValid ? '✓ Équilibré' : ds === 'pos' ? '▲ Excédent' : '▼ Manquant') : 'En attente'}`;
     }
 
     const res = document.getElementById(`res-${cid}`);
@@ -894,6 +917,7 @@ const App = (() => {
     const diff = document.getElementById(`diff-${cid}`);
     if (diff) {
       diff.style.display = showDiff ? '' : 'none';
+      diff.className = `diff-alert ${ds}`;
       const dv = document.getElementById(`diffval-${cid}`);
       if (dv) dv.textContent = showDiff ? fmtD(c.diff) : '';
     }

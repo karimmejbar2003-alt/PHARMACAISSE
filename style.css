@@ -274,10 +274,13 @@ html, body {
   border-color: rgba(40, 205, 65, 0.30);
   box-shadow: var(--sh-sm), 0 0 0 0.5px rgba(40, 205, 65, 0.20);
 }
-
 .pc.bad {
   border-color: rgba(255, 59, 47, 0.30);
   box-shadow: var(--sh-sm), 0 0 0 0.5px rgba(255, 59, 47, 0.20);
+}
+.pc.warn {
+  border-color: rgba(255, 159, 10, 0.35);
+  box-shadow: var(--sh-sm), 0 0 0 0.5px rgba(255, 159, 10, 0.20);
 }
 
 /* Card Header */
@@ -314,6 +317,9 @@ html, body {
 
 .pill-bad   { background: var(--bad-bg); color: var(--bad); }
 .pill-bad   .pill-dot { background: var(--bad); box-shadow: 0 0 4px var(--bad); }
+
+.pill-warn  { background: rgba(255,159,10,0.12); color: var(--warn); }
+.pill-warn  .pill-dot { background: var(--warn); box-shadow: 0 0 4px var(--warn); }
 
 /* ── SOBRUS HERO ──────────────────────────────────────────────── */
 .sobrus-hero {
@@ -468,10 +474,19 @@ html, body {
 .diff-alert {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 18px;
+  font-size: 14px; font-weight: 700; letter-spacing: -0.1px;
+}
+/* Négatif = rouge (manquant) */
+.diff-alert.neg, .diff-alert:not(.pos) {
   background: var(--bad-bg);
   border-top: 0.5px solid rgba(255, 59, 47, 0.12);
-  font-size: 14px; font-weight: 700; color: var(--bad);
-  letter-spacing: -0.1px;
+  color: var(--bad);
+}
+/* Positif = orange (excédent) */
+.diff-alert.pos {
+  background: rgba(255, 159, 10, 0.09);
+  border-top: 0.5px solid rgba(255, 159, 10, 0.18);
+  color: var(--warn);
 }
 
 /* ── NOTE SECTION ─────────────────────────────────────────────── */
@@ -1054,18 +1069,36 @@ html, body {
   overflow: hidden;
 }
 
+.day-total-title {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--t2); padding: 12px 18px 8px;
+  border-bottom: 0.5px solid var(--sep);
+}
+
 .day-total-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 18px;
+  padding: 11px 18px;
   border-bottom: 0.5px solid var(--sep);
   font-size: 15px;
 }
 .day-total-row:last-child { border-bottom: none; }
-.day-total-row.ok  { color: var(--ok);  font-weight: 600; }
-.day-total-row.bad { color: var(--bad); font-weight: 600; }
+.day-total-row.ok   { color: var(--ok);   font-weight: 600; }
+.day-total-row.bad  { color: var(--bad);  font-weight: 600; }
+.day-total-row.warn { color: var(--warn); font-weight: 600; }
 
 .day-total-label { color: var(--t2); font-size: 14px; }
 .day-total-val   { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.3px; }
+.day-total-val.primary { font-size: 16px; color: var(--t1); }
+
+.day-total-sub { background: var(--bg-inset); padding: 2px 0; }
+.day-total-sub-row {
+  display: flex; justify-content: space-between;
+  padding: 6px 18px 6px 28px;
+  font-size: 13px; color: var(--t2);
+  border-bottom: 0.5px solid var(--sep);
+}
+.day-total-sub-row:last-child { border-bottom: none; }
 
 /* ── FOURNISSEUR TOGGLE ROWS ───────────────────────────────────── */
 .fourni-row { gap: 10px; }
