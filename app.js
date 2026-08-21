@@ -68,23 +68,25 @@ const App = (() => {
       && Notification.permission === 'granted';
   }
 
-  async function sendReminder(pid) {
+  async function sendReminder(pid, cid) {
     if (!db) return toast('Firebase non connecté');
     const pharmacy = S.pharmacies.find(p => p.id === pid); if (!pharmacy) return;
-    const day = dayData(pid, S.date);
-    const missing = pharmacy.caisses.filter(c => !day[c.id]?.lockedByEmp).map(c => c.name);
-    if (!missing.length) return toast('Tous les employés ont soumis leurs données');
+    const caisse   = pharmacy.caisses.find(c => c.id === cid); if (!caisse) return;
+    if (dayData(pid, S.date)[cid]?.lockedByEmp) return toast(`${caisse.name} a déjà soumis ses données`);
     const snap = await db.doc(FS_DOC).get().catch(() => null);
     if (!snap) return;
-    const subs = (snap.data()?.empPushSubs || [])
-      .filter(s => s.pharmacyId === pid && pharmacy.caisses.find(c => c.id === s.caisseId && !day[c.id]?.lockedByEmp));
-    if (!subs.length) return toast('Aucun employé n\'a activé les rappels');
-    const payload = { title: 'PharmaCaisse — Rappel', body: 'Merci de saisir vos chiffres du jour', icon: '/icon-192.png' };
+    const subs = (snap.data()?.empPushSubs || []).filter(s => s.pharmacyId === pid && s.caisseId === cid);
+    if (!subs.length) return toast(`${caisse.name} n'a pas activé les rappels`);
+    const payload = {
+      title: 'PharmaCaisse — Rappel',
+      body: `Merci de saisir vos chiffres du jour`,
+      icon: '/icon-192.png'
+    };
     await Promise.all(subs.map(s =>
       fetch('/api/notify', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ subscription: s.sub, payload }) }).catch(() => {})
     ));
-    toast(`Rappel envoyé — ${subs.length} employé${subs.length > 1 ? 's' : ''}`);
+    toast(`Rappel envoyé à ${caisse.name}`);
   }
 
   async function empSubscribePush() {
@@ -700,7 +702,6 @@ const App = (() => {
         <button class="btn btn-secondary btn-sm" onclick="App.exportCSV('day')">CSV</button>
         <button class="btn btn-secondary btn-sm" onclick="App.exportPDF('day')">PDF</button>
         ${!isDayLocked(pharmacy.id) ? `
-        <button class="btn btn-secondary btn-sm" onclick="App.sendReminder('${pharmacy.id}')">Rappel</button>
         <button class="btn btn-muted btn-sm" onclick="App.lockDay('${pharmacy.id}')">Clôturer</button>` : ''}
       </div>
 
@@ -845,10 +846,9 @@ const App = (() => {
           ${entry.savedAt ? `✓ Sauvegardé à ${fmtTime(entry.savedAt)}` : ''}
         </span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-          ${entry.lockedByEmp ? `
-            <button class="btn btn-muted btn-sm" onclick="App.unlockForEmp('${pid}','${cid}')" title="Permet à l'employé de modifier ce jour">
-              Déverrouiller
-            </button>` : ''}
+          ${!entry.lockedByEmp
+            ? `<button class="btn btn-muted btn-sm" onclick="App.sendReminder('${pid}','${cid}')">Rappel</button>`
+            : `<button class="btn btn-muted btn-sm" onclick="App.unlockForEmp('${pid}','${cid}')">Déverrouiller</button>`}
           ${!c.isValid && c.hasData
             ? vu
               ? `<span class="vu-badge">Vu</span>`
