@@ -838,7 +838,7 @@ const App = (() => {
             <button class="btn btn-muted btn-sm" onclick="App.unlockForEmp('${pid}','${cid}')" title="Permet à l'employé de modifier ce jour">
               Déverrouiller
             </button>` : ''}
-          ${!c.isValid && c.hasData && c.sobrusOk
+          ${!c.isValid && c.hasData
             ? vu
               ? `<span class="vu-badge">Vu</span>`
               : `<button class="btn btn-vu btn-sm" onclick="App.validateCard('${pid}','${cid}')">Marquer vu</button>`
