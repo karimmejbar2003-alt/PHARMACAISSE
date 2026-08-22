@@ -1530,23 +1530,77 @@ const App = (() => {
     toast('Jour déverrouillé — l\'employé peut modifier');
   }
 
+  let _cal = { y: 0, m: 0 };
+
   function openDatePicker() {
-    const inp = document.createElement('input');
-    inp.type = 'date';
-    inp.value = S.date;
-    inp.max = today();
-    inp.style.cssText = 'position:fixed;opacity:0;top:0;left:0;width:1px;height:1px;pointer-events:none';
-    document.body.appendChild(inp);
-    inp.addEventListener('change', () => {
-      if (inp.value && inp.value <= today()) {
-        S.date = inp.value;
-        render(); window.scrollTo(0, 0);
-      }
-      inp.remove();
-    });
-    inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 300));
-    inp.focus(); inp.click();
-    if (inp.showPicker) inp.showPicker();
+    const [cy, cm] = S.date.split('-').map(Number);
+    _cal.y = cy; _cal.m = cm;
+    _showCal();
+  }
+
+  function _buildCal() {
+    const { y, m } = _cal;
+    const td        = today();
+    const curMonth  = `${y}-${String(m).padStart(2,'0')}`;
+    const monthName = new Date(y, m - 1, 15)
+      .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const firstDow  = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Lu=0
+    const daysTotal = new Date(y, m, 0).getDate();
+    const canPrev   = curMonth > '2024-01';
+    const canNext   = curMonth < td.slice(0, 7);
+
+    let cells = '';
+    for (let i = 0; i < firstDow; i++) cells += '<div class="cal-empty"></div>';
+    for (let d = 1; d <= daysTotal; d++) {
+      const ds   = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const fut  = ds > td;
+      const sel  = ds === S.date;
+      const isT  = ds === td;
+      const cls  = `cal-day${sel?' sel':''}${isT&&!sel?' tod':''}${fut?' dis':''}`;
+      cells += fut
+        ? `<div class="${cls}">${d}</div>`
+        : `<div class="${cls}" onclick="App._calPick('${ds}')">${d}</div>`;
+    }
+    return `
+      <div class="cal-nav-row">
+        <button class="cal-arrow ${canPrev?'':'off'}" onclick="App._calMove(-1)">‹</button>
+        <span class="cal-month-lbl">${monthName}</span>
+        <button class="cal-arrow ${canNext?'':'off'}" onclick="App._calMove(1)">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-dow">Lu</div><div class="cal-dow">Ma</div><div class="cal-dow">Me</div>
+        <div class="cal-dow">Je</div><div class="cal-dow">Ve</div>
+        <div class="cal-dow">Sa</div><div class="cal-dow">Di</div>
+        ${cells}
+      </div>`;
+  }
+
+  function _showCal() {
+    closeModal();
+    const el = document.createElement('div');
+    el.className = 'sheet-overlay'; el.id = 'modal-overlay';
+    el.innerHTML = `
+      <div class="sheet cal-sheet">
+        <div class="sheet-pull"></div>
+        <div id="cal-body">${_buildCal()}</div>
+        <div class="sheet-actions">
+          <button class="sheet-btn cancel" onclick="App.closeModal()">Annuler</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    el.addEventListener('pointerdown', e => { if (e.target === el) closeModal(); });
+  }
+
+  function _calMove(dir) {
+    _cal.m += dir;
+    if (_cal.m > 12) { _cal.m = 1;  _cal.y++; }
+    if (_cal.m < 1)  { _cal.m = 12; _cal.y--; }
+    const b = document.getElementById('cal-body');
+    if (b) b.innerHTML = _buildCal();
+  }
+
+  function _calPick(ds) {
+    S.date = ds; closeModal(); render(); window.scrollTo(0, 0);
   }
 
   function prevDay() {
@@ -2220,7 +2274,7 @@ const App = (() => {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    setView, back, prevDay, nextDay, openDatePicker, selectPharmacy,
+    setView, back, prevDay, nextDay, openDatePicker, _calMove, _calPick, selectPharmacy,
     onInput, saveCard, saveAll, showDetail,
     addPharmacy, renamePharmacy, deletePharmacy,
     addCaisse, renameCaisse, deleteCaisse,
