@@ -474,10 +474,13 @@ html, body {
 .result-line.verdict {
   font-size: 15px; font-weight: 700;
   padding: 13px 18px;
+  color: var(--t1);
+  background: var(--bg-inset);
+  border-top: 0.5px solid var(--border);
+  letter-spacing: -0.2px;
 }
 
-.result-line.verdict.ok  { color: var(--ok); }
-.result-line.verdict.bad { color: var(--bad); }
+.result-line.verdict.ok  { color: var(--ok); background: var(--ok-bg); }
 
 .result-val { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--t1); }
 
